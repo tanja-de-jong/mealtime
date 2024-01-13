@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "mealtime",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--web-port",
+                "5000",
+            ],
+        },
+        {
+            "name": "mealtime (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+    ]
+}

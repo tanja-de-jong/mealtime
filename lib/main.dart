@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:mealtime/presence_list.dart';
+import 'package:mealtime/plan.dart';
 import 'package:mealtime/sign_in_page.dart';
 
 void main() async {
@@ -48,7 +48,7 @@ class MyApp extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.active) {
             final User? user = snapshot.data;
-            return user == null ? const SignInPage() : const PresenceList();
+            return user == null ? const SignInPage() : const Plan();
           }
           return const CircularProgressIndicator();
         },
