@@ -1,6 +1,6 @@
 # mealtime
 
-A new Flutter project.
+A Flutter project for meal planning.
 
 ## Getting Started
 
