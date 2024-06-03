@@ -1,18 +1,19 @@
+import 'package:clipboard/clipboard.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:mealtime/constants.dart';
-import 'package:mealtime/nav_scaffold.dart';
-import 'package:mealtime/utils.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mealtime/food/helpers/constants.dart';
+import 'package:mealtime/food/helpers/database.dart';
+import 'package:mealtime/food/helpers/utils.dart';
 
-class PresenceList extends StatefulWidget {
-  const PresenceList({super.key});
+class PresencePage extends StatefulWidget {
+  const PresencePage({super.key});
 
   @override
-  PresenceListState createState() => PresenceListState();
+  PresencePageState createState() => PresencePageState();
 }
 
-class PresenceListState extends State<PresenceList> {
+class PresencePageState extends State<PresencePage> {
   bool loading = true;
   WeekDay startDay = WeekDay.monday;
   MealType startMeal = MealType.dinner;
@@ -23,55 +24,6 @@ class PresenceListState extends State<PresenceList> {
     MealType.dinner: {},
   };
   bool dataExists = false;
-
-  bool isCountableMeal(MealType meal, day) {
-    bool isCountableLunch =
-        (day != daysInRange.first || startMeal == MealType.lunch) &&
-            startMeal == MealType.lunch;
-    bool isCountableDinner =
-        (day != daysInRange.last || startMeal == MealType.lunch) &&
-            startMeal == MealType.dinner;
-    return isCountableLunch || isCountableDinner;
-  }
-
-  /*
-   * This function counts the presence at a specific meal (lunch or dinner) for a given presence status.
-   * It iterates over the daysInRange list and increments the count if the selected meal for the day equals the presence status.
-   * The function returns the count.
-   */
-  int countPresenceAtMeal(meal, presence) {
-    int count = 0;
-    for (String day in daysInRange) {
-      if (isCountableMeal(meal, day) && selectedMeals[meal]![day] == presence) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  /*
-   * This function counts the presence at both meals for every presence status.
-   * It iterates over the _presence list and calls the countPresenceAtMeal function for every presence status.
-   * The function returns a Column containing a Text widget for every presence status and a Text widget with the total count.
-   */
-  countPresenceAtMeals() {
-    int totalLunchCount = 0;
-    int totalDinnerCount = 0;
-    List<Text> presenceCount = [];
-    for (int i = 0; i < Presence.values.length; i++) {
-      Presence presence = Presence.values[i];
-      int factor = presence.count;
-      int lunchCount = countPresenceAtMeal(MealType.lunch, i);
-      totalLunchCount += lunchCount * factor;
-      int dinnerCount = countPresenceAtMeal(MealType.dinner, i);
-      totalDinnerCount += dinnerCount * factor;
-      presenceCount
-          .add(Text('$presence: $lunchCount lunch, $dinnerCount dinner'));
-    }
-    presenceCount
-        .add(Text("Totaal: $totalLunchCount lunch, $totalDinnerCount dinner"));
-    return Column(children: presenceCount);
-  }
 
   /*
    * This function sets the default presence for every day in the daysInRange list.
@@ -160,6 +112,52 @@ class PresenceListState extends State<PresenceList> {
     }
   }
 
+  String presenceListToString() {
+    Map<String, int> counts = {
+      'lunch voor 1 persoon': 0,
+      'lunch voor 2 personen': 0,
+      'diner voor 1 persoon': 0,
+      'diner voor 2 personen': 0,
+    };
+
+    selectedMeals.forEach((mealType, presenceMap) {
+      presenceMap.forEach((date, presence) {
+        if ((mealType == MealType.lunch && date == daysInRange.first) ||
+            (mealType == MealType.dinner && date == daysInRange.last)) {
+          return;
+        }
+
+        String key;
+        if (mealType == MealType.lunch) {
+          key = 'lunch voor ';
+        } else {
+          key = 'diner voor ';
+        }
+        if (presence == Presence.tanja || presence == Presence.mattanja) {
+          key += '1 persoon';
+        } else if (presence == Presence.all) {
+          key += '2 personen';
+        }
+
+        if (counts[key] != null) {
+          counts.update(key, (value) => value + 1);
+        }
+      });
+    });
+
+    return counts.entries.map((e) => '${e.value}x ${e.key}').join(', ');
+  }
+
+  String generatePantryList(List<DocumentSnapshot> documents) {
+    String template =
+        "Ik heb recepten nodig voor ${presenceListToString()}. Ik wil graag één recept per keer kiezen. Ik heb de volgende ingrediënten in huis:\n\n";
+    return template +
+        documents.map((document) {
+          Map<String, dynamic> data = document.data() as Map<String, dynamic>;
+          return '${data['name']}: ${data['quantity']} ${data['unit']}';
+        }).join('\n');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -169,7 +167,8 @@ class PresenceListState extends State<PresenceList> {
 
   @override
   Widget build(BuildContext context) {
-    return NavScaffold(
+    final DatabaseService dbService = DatabaseService();
+    return Scaffold(
       appBar: AppBar(
         title: const Text('Aanwezigheid'),
         actions: <Widget>[
@@ -273,7 +272,6 @@ class PresenceListState extends State<PresenceList> {
                                           );
                                         }).toList(),
                                         onChanged: (Presence? newValue) {
-                                          print("Changed $newValue");
                                           setState(() {
                                             selectedMeals[MealType.lunch]![
                                                 day] = newValue!;
@@ -326,7 +324,28 @@ class PresenceListState extends State<PresenceList> {
                     },
                   ))
                 ])),
-      selectedIndex: 1,
+      floatingActionButton: StreamBuilder<QuerySnapshot>(
+        stream: DatabaseService.getPantryItems(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return FloatingActionButton(
+              child: Image.asset('assets/images/chatgpt_logo.png'),
+              onPressed: () {
+                String pantryList = generatePantryList(snapshot.data!.docs);
+                FlutterClipboard.copy(pantryList);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Pantry list copied to clipboard'),
+                    backgroundColor: Colors.teal,
+                  ),
+                );
+              },
+            );
+          } else {
+            return Container(); // Return an empty container when there's no data
+          }
+        },
+      ),
     );
   }
 }

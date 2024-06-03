@@ -1,18 +1,19 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:mealtime/nav_scaffold.dart';
-import 'package:mealtime/utils.dart';
-import 'package:dropdown_search/dropdown_search.dart';
+import 'package:mealtime/food/helpers/constants.dart';
+import 'package:mealtime/food/helpers/utils.dart';
+import 'package:mealtime/food/pages/week_planning/select_recipe_dialog.dart';
+import 'package:mealtime/food/types/recipe.dart';
 
-class Plan extends StatefulWidget {
-  const Plan({super.key});
+class WeekPlanningPage extends StatefulWidget {
+  const WeekPlanningPage({super.key});
 
   @override
-  PlanState createState() => PlanState();
+  WeekPlanningPageState createState() => WeekPlanningPageState();
 }
 
-class PlanState extends State<Plan> {
+class WeekPlanningPageState extends State<WeekPlanningPage> {
   DateTime now = DateTime.now();
   late DateTime _startDate;
   late DateTime _endDate;
@@ -20,91 +21,32 @@ class PlanState extends State<Plan> {
   num totalDinners = 0;
   String _startMeal = 'Dinner';
   String _endMeal = 'Lunch';
-  List<Map<String, dynamic>> _recipes = [];
-  final List<Map<String, dynamic>> _selectedRecipes = [];
+  List<Recipe> _recipes = [];
+  List<Map<String, dynamic>> _selectedRecipes = [];
   List<num> presenceValues = [0, 1, 1, 2];
+
+  void addSelectedRecipe(recipeId, name, portions, List<MealType> types) {
+    Map<String, Object> recipe = {
+      'id': recipeId,
+      'name': name,
+      'portions': portions,
+      'types': types.map((e) => e.name),
+    };
+    setState(() {
+      _selectedRecipes.add(recipe);
+    });
+
+    FirebaseFirestore.instance.collection('selected_recipes').add(recipe);
+  }
 
   void _addRecipe() {
     if (_recipes.isNotEmpty) {
-      int selectedRecipeIndex = 0;
-      TextEditingController portionsController = TextEditingController(
-          text: _recipes[selectedRecipeIndex]['portions'].toString());
-      TextEditingController typeController =
-          TextEditingController(text: _recipes[selectedRecipeIndex]['type']);
-
       showDialog(
         context: context,
         builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Add a new recipe'),
-            content: Column(
-              children: [
-                DropdownSearch<Map<String, dynamic>>(
-                  items: _recipes,
-                  selectedItem: _recipes[selectedRecipeIndex],
-                  onChanged: (Map<String, dynamic>? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        selectedRecipeIndex = _recipes.indexOf(newValue);
-                        portionsController.text = _recipes[selectedRecipeIndex]
-                                ['portions']
-                            .toString();
-                        typeController.text =
-                            _recipes[selectedRecipeIndex]['type'];
-                      });
-                    }
-                  },
-                  itemAsString: (Map<String, dynamic>? item) =>
-                      item?['name'] ?? '',
-                  showSearchBox: true,
-                ),
-                TextField(
-                  controller: portionsController,
-                  decoration: const InputDecoration(labelText: 'Portions'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: typeController,
-                  decoration: const InputDecoration(labelText: 'Type'),
-                ),
-              ],
-            ),
-            actions: <Widget>[
-              TextButton(
-                child: const Text('Save'),
-                onPressed: () {
-                  setState(() {
-                    // Add the selected recipe to the list
-                    _selectedRecipes.add(_recipes[selectedRecipeIndex]);
-
-                    // Update totalLunches or totalDinners
-                    if (_recipes[selectedRecipeIndex]['type'] == 'lunch') {
-                      totalLunches -=
-                          presenceValues[int.parse(portionsController.text)];
-                    } else if (_recipes[selectedRecipeIndex]['type'] ==
-                        'dinner') {
-                      totalDinners -=
-                          presenceValues[int.parse(portionsController.text)];
-                    }
-                  });
-
-                  Navigator.of(context).pop();
-                },
-              ),
-              TextButton(
-                child: const Text('Cancel'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          );
+          return SelectRecipeDialog(_recipes,
+              addSelectedRecipe: addSelectedRecipe);
         },
-      );
-    } else {
-      // Show a message to the user that there are no recipes
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No recipes available')),
       );
     }
   }
@@ -157,6 +99,17 @@ class PlanState extends State<Plan> {
         await FirebaseFirestore.instance.collection('recipes').get();
 
     _recipes = querySnapshot.docs
+        .map((doc) =>
+            Recipe.fromJson(doc.id, doc.data() as Map<String, dynamic>))
+        .toList();
+    setState(() {});
+  }
+
+  Future<void> _loadSelectedRecipes() async {
+    QuerySnapshot querySnapshot =
+        await FirebaseFirestore.instance.collection('selected_recipes').get();
+
+    _selectedRecipes = querySnapshot.docs
         .map((doc) => doc.data() as Map<String, dynamic>)
         .toList();
     setState(() {});
@@ -169,11 +122,12 @@ class PlanState extends State<Plan> {
     _endDate = _startDate.add(const Duration(days: 7));
     _loadPresences();
     _loadRecipes();
+    _loadSelectedRecipes();
   }
 
   @override
   Widget build(BuildContext context) {
-    return NavScaffold(
+    return Scaffold(
       appBar: AppBar(
         title: const Text('Planning'),
       ),
@@ -267,7 +221,7 @@ class PlanState extends State<Plan> {
                 final recipe = _selectedRecipes[index];
                 return ListTile(
                   title: Text(
-                      '${recipe['name']} (${recipe['portions']} portions, ${recipe['type']})'),
+                      '${recipe['name']} (${recipe['portions']} porties, ${recipe['types']?.map((e) => MealType.values.firstWhere((t) => t.name == e).value).join(', ')})})'),
                 );
               },
             ),
@@ -277,7 +231,6 @@ class PlanState extends State<Plan> {
           Text('Total dinners: $totalDinners'),
         ],
       ),
-      selectedIndex: 0,
     );
   }
 }

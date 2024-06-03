@@ -14,6 +14,17 @@ extension MealTypeExtension on MealType {
   }
 }
 
+MealType mealTypeFromValue(String value) {
+  switch (value.toLowerCase()) {
+    case 'lunch':
+      return MealType.lunch;
+    case 'diner':
+      return MealType.dinner;
+    default:
+      throw ArgumentError('Invalid meal type: $value');
+  }
+}
+
 enum Presence {
   none,
   tanja,
