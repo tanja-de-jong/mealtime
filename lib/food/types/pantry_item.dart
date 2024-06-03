@@ -4,10 +4,10 @@ import 'package:mealtime/general/utils.dart';
 class PantryItem {
   final String? id;
   final String name;
-  final int? quantity;
+  final double? quantity;
   final String? unit;
   final List<PantryItemUsage> usages;
-  final DateTime dateOfReceival;
+  final DateTime? dateOfReceival;
 
   PantryItem({
     this.id,
@@ -15,7 +15,7 @@ class PantryItem {
     this.quantity,
     this.unit,
     this.usages = const [],
-    required this.dateOfReceival,
+    this.dateOfReceival,
   });
 
   Map<String, dynamic> toJson() {
@@ -35,11 +35,12 @@ class PantryItem {
       quantity: object['quantity'],
       unit: object['unit'],
       usages: object['usages']
-          ?.map<PantryItemUsage>(
-            (usage) => PantryItemUsage.fromJson(usage),
-          )
-          .toList(),
-      dateOfReceival: DateTime.parse(object['dateOfReceival']),
+              ?.map(
+                (usage) => PantryItemUsage.fromJson(usage),
+              )
+              .toList() ??
+          [],
+      dateOfReceival: DateTime.tryParse(object['dateOfReceival'] ?? ""),
     );
   }
 
@@ -53,6 +54,6 @@ class PantryItem {
   }
 
   String dateOfReceivalString() {
-    return formatDate(dateOfReceival);
+    return dateOfReceival == null ? "" : formatDate(dateOfReceival!);
   }
 }
