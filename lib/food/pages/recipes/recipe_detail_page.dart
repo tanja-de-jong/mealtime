@@ -34,7 +34,7 @@ class RecipeDetailPageState extends State<RecipeDetailPage> {
               Text(ingredient.name, style: const TextStyle(fontSize: 16)),
             const Text('Steps:',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            for (var step in widget.recipe.steps)
+            for (var step in widget.recipe.preparation)
               Text(step, style: const TextStyle(fontSize: 16)),
           ],
         ),

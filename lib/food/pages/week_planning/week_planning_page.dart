@@ -2,9 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mealtime/food/helpers/constants.dart';
+import 'package:mealtime/food/helpers/database.dart';
 import 'package:mealtime/food/helpers/utils.dart';
 import 'package:mealtime/food/pages/week_planning/select_recipe_dialog.dart';
-import 'package:mealtime/food/types/recipe.dart';
+import 'package:mealtime/food/types/recipe_instance.dart';
 
 class WeekPlanningPage extends StatefulWidget {
   const WeekPlanningPage({super.key});
@@ -21,7 +22,7 @@ class WeekPlanningPageState extends State<WeekPlanningPage> {
   num totalDinners = 0;
   String _startMeal = 'Dinner';
   String _endMeal = 'Lunch';
-  List<Recipe> _recipes = [];
+  List<RecipeInstance> _recipes = [];
   List<Map<String, dynamic>> _selectedRecipes = [];
   List<num> presenceValues = [0, 1, 1, 2];
 
@@ -80,10 +81,10 @@ class WeekPlanningPageState extends State<WeekPlanningPage> {
                   totalLunches += presenceValues[dayData['lunch']['presence']];
                 }
               }
-              if (dayData.containsKey('diner') &&
-                  dayData['diner']['presence'] > 0) {
+              if (dayData.containsKey('dinner') &&
+                  dayData['dinner']['presence'] > 0) {
                 if (!(day == 7 && _endMeal == 'Lunch')) {
-                  totalDinners += presenceValues[dayData['diner']['presence']];
+                  totalDinners += presenceValues[dayData['dinner']['presence']];
                 }
               }
             }
@@ -95,13 +96,7 @@ class WeekPlanningPageState extends State<WeekPlanningPage> {
   }
 
   Future<void> _loadRecipes() async {
-    QuerySnapshot querySnapshot =
-        await FirebaseFirestore.instance.collection('recipes').get();
-
-    _recipes = querySnapshot.docs
-        .map((doc) =>
-            Recipe.fromJson(doc.id, doc.data() as Map<String, dynamic>))
-        .toList();
+    _recipes = await DatabaseService.getRecipeInstances();
     setState(() {});
   }
 
@@ -221,7 +216,7 @@ class WeekPlanningPageState extends State<WeekPlanningPage> {
                 final recipe = _selectedRecipes[index];
                 return ListTile(
                   title: Text(
-                      '${recipe['name']} (${recipe['portions']} porties, ${recipe['types']?.map((e) => MealType.values.firstWhere((t) => t.name == e).value).join(', ')})})'),
+                      '${recipe['name']} (${recipe['portions']} porties, ${recipe['types']?.map((e) => MealType.values.firstWhere((t) => t.name == e).label).join(', ')})})'),
                 );
               },
             ),

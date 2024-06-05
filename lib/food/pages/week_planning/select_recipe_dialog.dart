@@ -1,10 +1,10 @@
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:mealtime/food/helpers/constants.dart';
-import 'package:mealtime/food/types/recipe.dart';
+import 'package:mealtime/food/types/recipe_instance.dart';
 
 class SelectRecipeDialog extends StatefulWidget {
-  final List<Recipe> recipes;
+  final List<RecipeInstance> recipes;
   final Function addSelectedRecipe;
 
   const SelectRecipeDialog(this.recipes,
@@ -15,7 +15,7 @@ class SelectRecipeDialog extends StatefulWidget {
 }
 
 class SelectRecipeDialogState extends State<SelectRecipeDialog> {
-  Recipe? selectedRecipe;
+  RecipeInstance? selectedRecipe;
   TextEditingController portionsController = TextEditingController(text: '');
   List<MealType> types = [];
 
@@ -25,9 +25,9 @@ class SelectRecipeDialogState extends State<SelectRecipeDialog> {
       title: const Text('Voeg recept toe'),
       content: Column(
         children: [
-          DropdownSearch<Recipe>(
+          DropdownSearch<RecipeInstance>(
             items: widget.recipes,
-            onChanged: (Recipe? newValue) {
+            onChanged: (RecipeInstance? newValue) {
               if (newValue != null) {
                 setState(() {
                   selectedRecipe = newValue;
@@ -36,7 +36,7 @@ class SelectRecipeDialogState extends State<SelectRecipeDialog> {
                 });
               }
             },
-            itemAsString: (Recipe? item) => item?.name ?? '',
+            itemAsString: (RecipeInstance? item) => item?.name ?? '',
             dropdownDecoratorProps: const DropDownDecoratorProps(
               dropdownSearchDecoration: InputDecoration(
                 labelText: "Recept",
@@ -50,7 +50,7 @@ class SelectRecipeDialogState extends State<SelectRecipeDialog> {
           ),
           DropdownSearch<MealType>.multiSelection(
             items: MealType.values.toList(),
-            itemAsString: (MealType type) => type.value,
+            itemAsString: (MealType type) => type.label,
             selectedItems: const [],
             onChanged: (List<MealType>? newValues) {
               if (newValues != null) {

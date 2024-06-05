@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mealtime/food/types/pantry_item.dart';
+import 'package:mealtime/food/types/product.dart';
 import 'package:mealtime/general/dialogs.dart';
 import 'package:mealtime/general/utils.dart';
 
@@ -14,94 +14,194 @@ class PantryPage extends StatefulWidget {
 }
 
 class PantryPageState extends State<PantryPage> {
+  bool loading = true;
+  String searchTerm = '';
+  List<Product> products = [];
+  List<PantryItem> pantryItems = [];
+  List<PantryItem> filteredPantryItems = [];
+
+  void filterItems(String searchTerm) {
+    filteredPantryItems = pantryItems
+        .where((item) =>
+            item.name.toLowerCase().contains(searchTerm.toLowerCase()) ||
+            item.productId != null &&
+                products
+                    .firstWhere((product) => product.id == item.productId)
+                    .name
+                    .toLowerCase()
+                    .contains(searchTerm.toLowerCase()))
+        .toList();
+    setState(() {
+      filteredPantryItems.sort((a, b) => a.name.compareTo(b.name));
+    });
+  }
+
+  void loadData() async {
+    await DatabaseService.getProducts();
+    pantryItems = await DatabaseService.getPantryItems();
+    filterItems("");
+
+    setState(() {
+      products = DatabaseService.products;
+      loading = false;
+    });
+  }
+
+  void reserveItem(PantryItem item) async {
+    await DatabaseService.reservePantryItem(item.id!, !item.reserved);
+    setState(() {
+      filteredPantryItems = filteredPantryItems
+          .map((pantryItem) => pantryItem.id == item.id
+              ? PantryItem(
+                  id: pantryItem.id,
+                  productId: pantryItem.productId,
+                  name: pantryItem.name,
+                  quantity: pantryItem.quantity,
+                  unit: pantryItem.unit,
+                  usages: pantryItem.usages,
+                  dateOfReceival: pantryItem.dateOfReceival,
+                  reserved: !pantryItem.reserved,
+                )
+              : pantryItem)
+          .toList();
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Voorraad'),
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream:
-            DatabaseService.getPantryItems(), // Use the getPantryItems method
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Text('Something went wrong');
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Text("Loading");
-          }
-
-          List<PantryItem> pantryItems = snapshot.data!.docs
-              .map((DocumentSnapshot document) => PantryItem.fromJson(
-                  document.id, document.data() as Map<String, dynamic>))
-              .toList();
-          pantryItems.sort((a, b) => a.name.compareTo(b.name));
-
-          return ListView(
-            children: pantryItems.map((PantryItem item) {
-              return ListTile(
-                title: Padding(
-                  padding: const EdgeInsets.only(bottom: 1.0),
-                  child: Text(
-                    item.toString(),
+        appBar: AppBar(
+          title: const Text('Voorraad'),
+        ),
+        body: loading
+            ? const CircularProgressIndicator()
+            : Column(children: [
+                TextField(
+                  onChanged: (value) {
+                    setState(() {
+                      filterItems(value);
+                    });
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Search',
+                    prefixIcon: Icon(Icons.search),
                   ),
                 ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: item.usages.map<Widget>((usage) {
-                        return Text(usage.toString());
-                      }).toList() ??
-                      [],
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => showEditItemDialog(context, item),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () async {
-                        bool confirm = await Dialogs.showConfirmationDialog(
-                              context,
-                              'Remove pantry item',
-                              'Are you sure you want to remove this pantry item?',
-                            ) ??
-                            false;
-                        if (confirm) {
-                          DatabaseService.deletePantryItem(item
-                              .id!); // Assume this method exists in DatabaseService
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          );
-        },
-      ),
-      floatingActionButton: StreamBuilder<QuerySnapshot>(
-        stream: DatabaseService.getPantryItems(),
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            return FloatingActionButton(
-                child: const Icon(Icons.add),
-                onPressed: () => showEditItemDialog(context, null));
-          } else {
-            return Container(); // Return an empty container when there's no data
-          }
-        },
-      ),
-    );
+                Expanded(
+                    child: LayoutBuilder(
+                        builder: (context, constraints) =>
+                            SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                        minWidth: constraints.maxWidth),
+                                    child: DataTable(
+                                      dataRowMaxHeight: double.infinity,
+                                      columns: const <DataColumn>[
+                                        DataColumn(label: Text('Product')),
+                                        DataColumn(
+                                          label: Text('Naam'),
+                                        ),
+                                        DataColumn(
+                                          label: Text('Aantal'),
+                                        ),
+                                        DataColumn(
+                                          label: Text('Gebruik'),
+                                        ),
+                                        DataColumn(label: Text('Acties'))
+                                      ],
+                                      rows: filteredPantryItems
+                                          .map((PantryItem item) {
+                                        return DataRow(cells: <DataCell>[
+                                          DataCell(Text(item.productId == null
+                                              ? ""
+                                              : products
+                                                  .firstWhere((product) =>
+                                                      product.id ==
+                                                      item.productId)
+                                                  .name)),
+                                          DataCell(Text(
+                                            item.name,
+                                            style: TextStyle(
+                                              decoration: item.reserved
+                                                  ? TextDecoration.lineThrough
+                                                  : null,
+                                            ),
+                                          )),
+                                          DataCell(Text(
+                                              item.quantity?.toString() ??
+                                                  ' ${item.unit ?? ''}')),
+                                          DataCell(
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: item.usages
+                                                  .map<Widget>((usage) {
+                                                return Text(usage.toString());
+                                              }).toList(),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: <Widget>[
+                                                IconButton(
+                                                    icon: Icon(item.reserved
+                                                        ? Icons.check_circle
+                                                        : Icons
+                                                            .circle_outlined),
+                                                    onPressed: () =>
+                                                        reserveItem(item)),
+                                                IconButton(
+                                                  icon: const Icon(Icons.edit),
+                                                  onPressed: () =>
+                                                      showEditItemDialog(
+                                                          context,
+                                                          item,
+                                                          products),
+                                                ),
+                                                IconButton(
+                                                  icon:
+                                                      const Icon(Icons.delete),
+                                                  onPressed: () async {
+                                                    bool confirm = await Dialogs
+                                                            .showConfirmationDialog(
+                                                          context,
+                                                          'Remove pantry item',
+                                                          'Are you sure you want to remove this pantry item?',
+                                                        ) ??
+                                                        false;
+                                                    if (confirm) {
+                                                      DatabaseService
+                                                          .deletePantryItem(item
+                                                              .id!); // Assume this method exists in DatabaseService
+                                                    }
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        ]);
+                                      }).toList(),
+                                    )))))
+              ]),
+        floatingActionButton: FloatingActionButton(
+            child: const Icon(Icons.add),
+            onPressed: () => showEditItemDialog(context, null, products)));
   }
 
   void navigateToRecipe(String recipeId) {}
 }
 
-void showEditItemDialog(BuildContext context, PantryItem? item) async {
+void showEditItemDialog(
+    BuildContext context, PantryItem? item, products) async {
+  String? productId = item?.productId;
   final TextEditingController nameController =
       TextEditingController(text: item?.name);
   final TextEditingController quantityController =
@@ -111,12 +211,71 @@ void showEditItemDialog(BuildContext context, PantryItem? item) async {
   final TextEditingController dateController = TextEditingController(
       text: formatDate(item?.dateOfReceival ?? DateTime.now()));
 
+  String? newProductName = "";
+
   final newItem = await showDialog<Map<String, dynamic>>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(item == null ? 'Voeg item toe' : 'Pas item aan'),
       content: Column(
         children: [
+          DropdownButtonFormField<String>(
+            value: item?.productId,
+            items: products.map<DropdownMenuItem<String>>((Product product) {
+              return DropdownMenuItem<String>(
+                value: product.id,
+                child: Text(product.name),
+              );
+            }).toList(),
+            onChanged: (String? value) {
+              productId = value;
+            },
+            onSaved: (String? value) {
+              productId = value;
+            },
+            decoration: const InputDecoration(
+              labelText: 'Product',
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) {
+                  return AlertDialog(
+                    title: const Text('Voeg nieuw product toe'),
+                    content: TextField(
+                      onChanged: (value) {
+                        newProductName = value;
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Naam',
+                      ),
+                    ),
+                    actions: <Widget>[
+                      TextButton(
+                        child: const Text('Annuleer'),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      TextButton(
+                        child: const Text('Voeg toe'),
+                        onPressed: () async {
+                          DatabaseService.addProduct(newProductName!);
+                          DatabaseService.getProducts();
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+            child: const Text(
+              "+ Nieuw product",
+            ),
+          ),
           TextField(
             controller: nameController,
             autofocus: true,
@@ -153,6 +312,7 @@ void showEditItemDialog(BuildContext context, PantryItem? item) async {
           child: const Text('Save'),
           onPressed: () {
             Navigator.of(context).pop({
+              'productId': productId,
               'name': nameController.text,
               'quantity':
                   double.tryParse(quantityController.text.replaceAll(',', '.')),
@@ -168,6 +328,7 @@ void showEditItemDialog(BuildContext context, PantryItem? item) async {
   if (newItem != null) {
     if (item == null) {
       DatabaseService.addPantryItem(
+        newItem['productId'],
         newItem['name'].toLowerCase(),
         newItem['quantity'],
         newItem['unit'].toLowerCase(),
@@ -176,6 +337,7 @@ void showEditItemDialog(BuildContext context, PantryItem? item) async {
     } else {
       DatabaseService.updatePantryItem(
         item.id!,
+        newItem['productId'],
         newItem['name'].toLowerCase(),
         newItem['quantity'],
         newItem['unit'].toLowerCase(),

@@ -38,7 +38,7 @@ class EditRecipePageState extends State<EditRecipePage> {
             (e) => e.name,
           )
           .join('\n');
-      _stepsController.text = widget.recipe!.steps.join('\n');
+      _stepsController.text = widget.recipe!.preparation.join('\n');
     }
   }
 
@@ -51,7 +51,7 @@ class EditRecipePageState extends State<EditRecipePage> {
           _nameController.text,
           _sourceController.text,
           int.parse(_portionsController.text),
-          types.map((e) => e.value).toList(),
+          types.map((e) => e.label).toList(),
           _ingredientsController.text
               .split('\n')
               .map((ingredient) => ingredient.trim())
@@ -64,7 +64,7 @@ class EditRecipePageState extends State<EditRecipePage> {
           _nameController.text,
           _sourceController.text,
           int.parse(_portionsController.text),
-          types.map((e) => e.value).toList(),
+          types.map((e) => e.label).toList(),
           _ingredientsController.text
               .split('\n')
               .map((ingredient) => ingredient.trim())
@@ -116,7 +116,7 @@ class EditRecipePageState extends State<EditRecipePage> {
               ),
               DropdownSearch<MealType>.multiSelection(
                 items: MealType.values.toList(),
-                itemAsString: (MealType type) => type.value,
+                itemAsString: (MealType type) => type.label,
                 selectedItems: types,
                 onChanged: (List<MealType>? newValues) {
                   if (newValues != null) {

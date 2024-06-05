@@ -4,7 +4,7 @@ enum MealType {
 }
 
 extension MealTypeExtension on MealType {
-  String get value {
+  String get label {
     switch (this) {
       case MealType.lunch:
         return 'Lunch';
@@ -18,7 +18,7 @@ MealType mealTypeFromValue(String value) {
   switch (value.toLowerCase()) {
     case 'lunch':
       return MealType.lunch;
-    case 'diner':
+    case 'dinner':
       return MealType.dinner;
     default:
       throw ArgumentError('Invalid meal type: $value');

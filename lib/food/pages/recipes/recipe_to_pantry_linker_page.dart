@@ -1,15 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mealtime/food/types/ingredient.dart';
 import 'package:mealtime/food/types/ingredient_to_pantry_items_mapping.dart';
-import 'package:mealtime/food/types/recipe.dart';
+import 'package:mealtime/food/types/pantry_item.dart';
+import 'package:mealtime/food/types/recipe_instance.dart';
 
 import '../../helpers/database.dart';
 
 class RecipeToPantryLinkerWidget extends StatefulWidget {
-  final Recipe recipe;
+  final RecipeInstance recipeInstance;
 
-  const RecipeToPantryLinkerWidget({super.key, required this.recipe});
+  const RecipeToPantryLinkerWidget({super.key, required this.recipeInstance});
 
   @override
   RecipeToPantryLinkerWidgetState createState() =>
@@ -20,17 +20,17 @@ class RecipeToPantryLinkerWidgetState
     extends State<RecipeToPantryLinkerWidget> {
   bool loading = true;
   List<Ingredient> ingredients = [];
-  Map<String, String> pantryItems = {};
+  List<PantryItem> pantryItems = [];
+  List<PantryItem> filteredPantryItems = [];
 
   Future<void> loadData() async {
-    List<DocumentSnapshot<Object?>> pantryItemDocs =
-        await DatabaseService.getAllPantryItems();
-    setState(() {
-      for (DocumentSnapshot doc in pantryItemDocs) {
-        Map<String, dynamic>? data = doc.data() as Map<String, dynamic>?;
-        pantryItems[doc.id] = data?['name'] as String;
-      }
+    List<PantryItem> data = await DatabaseService.getPantryItems();
+    pantryItems = data;
+    pantryItems = data;
 
+    setState(() {
+      filteredPantryItems =
+          pantryItems.where((item) => !item.reserved).toList();
       loading = false;
     });
   }
@@ -38,7 +38,7 @@ class RecipeToPantryLinkerWidgetState
   @override
   void initState() {
     super.initState();
-    ingredients = widget.recipe.ingredients;
+    ingredients = widget.recipeInstance.ingredients;
     loadData();
   }
 
@@ -51,7 +51,7 @@ class RecipeToPantryLinkerWidgetState
       body: loading
           ? const CircularProgressIndicator()
           : ListView.builder(
-              itemCount: widget.recipe.ingredients.length,
+              itemCount: widget.recipeInstance.ingredients.length,
               itemBuilder: (context, index) {
                 Ingredient ingredient = ingredients[index];
                 String ingredientName = ingredient.name;
@@ -73,7 +73,7 @@ class RecipeToPantryLinkerWidgetState
                           }
                         });
                       },
-                      items: [null, ...pantryItems.keys]
+                      items: [null, ...filteredPantryItems.map((e) => e.id)]
                           .map<DropdownMenuItem<String>>((String? value) {
                         return DropdownMenuItem<String>(
                           value: value,
@@ -82,7 +82,9 @@ class RecipeToPantryLinkerWidgetState
                                   style: TextStyle(fontStyle: FontStyle.italic),
                                   child: Text('Geen'),
                                 )
-                              : Text(pantryItems[value]!),
+                              : Text(filteredPantryItems
+                                  .firstWhere((element) => element.id == value)
+                                  .name),
                         );
                       }).toList(),
                     ));
@@ -91,7 +93,9 @@ class RecipeToPantryLinkerWidgetState
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           DatabaseService.linkRecipeIngredientsToPantryItems(
-              widget.recipe.id!, widget.recipe.name, ingredients);
+              widget.recipeInstance.id!,
+              widget.recipeInstance.name,
+              ingredients);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Ingredients linked to pantry items successfully!'),

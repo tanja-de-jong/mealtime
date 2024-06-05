@@ -325,7 +325,7 @@ class PresencePageState extends State<PresencePage> {
                   ))
                 ])),
       floatingActionButton: StreamBuilder<QuerySnapshot>(
-        stream: DatabaseService.getPantryItems(),
+        stream: DatabaseService.getPantryItemStream(),
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             return FloatingActionButton(

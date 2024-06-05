@@ -19,8 +19,8 @@ class PantryItemUsage {
 
   static PantryItemUsage fromJson(Map<String, dynamic> object) {
     return PantryItemUsage(
-      recipeId: object['recipeId'],
-      recipeName: object['recipeName'],
+      recipeId: object['recipeId'] ?? "",
+      recipeName: object['recipeName'] ?? "",
       ingredient: object['ingredient'],
     );
   }
