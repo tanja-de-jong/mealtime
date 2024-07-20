@@ -306,11 +306,9 @@ class PantryPageState extends State<PantryPage>
                             ),
                             DataCell(Text(item.name)),
                             DataCell((Column(
-                                children: item
-                                    .getAvailableQuantity()
-                                    .entries
-                                    .map((entry) =>
-                                        Text('${entry.value} ${entry.key}'))
+                                children: item.quantities
+                                    .map((quantity) => Text(
+                                        '${quantity.quantity} ${quantity.unit}'))
                                     .toList()))),
                             DataCell(
                               Column(
