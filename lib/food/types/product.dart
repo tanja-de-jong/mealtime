@@ -1,8 +1,8 @@
-class Product {
+class ProductCategory implements Comparable<ProductCategory> {
   final String? id;
   final String name;
 
-  Product({this.id, required this.name});
+  ProductCategory({this.id, required this.name});
 
   Map<String, dynamic> toJson() {
     return {
@@ -10,10 +10,15 @@ class Product {
     };
   }
 
-  static Product fromJson(String? id, Map<String, dynamic> object) {
-    return Product(
+  static ProductCategory fromJson(String? id, Map<String, dynamic> object) {
+    return ProductCategory(
       id: id,
       name: object['name'],
     );
+  }
+
+  @override
+  int compareTo(ProductCategory other) {
+    return name.compareTo(other.name);
   }
 }

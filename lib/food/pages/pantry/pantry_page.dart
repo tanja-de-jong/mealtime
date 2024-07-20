@@ -1,8 +1,10 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:mealtime/food/pages/pantry/edit_pantry_item_dialog.dart';
+import 'package:mealtime/food/pages/pantry/pantry_order_page.dart';
 import 'package:mealtime/food/types/pantry_item.dart';
 import 'package:mealtime/food/types/product.dart';
 import 'package:mealtime/general/dialogs.dart';
-import 'package:mealtime/general/utils.dart';
 
 import '../../helpers/database.dart'; // Import the file containing the DatabaseService class
 
@@ -13,64 +15,201 @@ class PantryPage extends StatefulWidget {
   PantryPageState createState() => PantryPageState();
 }
 
-class PantryPageState extends State<PantryPage> {
+class PantryPageState extends State<PantryPage>
+    with SingleTickerProviderStateMixin {
   bool loading = true;
   String searchTerm = '';
-  List<Product> products = [];
+  List<ProductCategory> products = [];
   List<PantryItem> pantryItems = [];
-  List<PantryItem> filteredPantryItems = [];
+  List<PantryItem> availableItems = [];
+  List<PantryItem> unavailableItems = [];
+  List<PantryItem> unknownQuantityItems = [];
+  List<PantryItem> missingIngredients = [];
+  TabController? tabController;
+  Map<PantryItem, bool> checkedItems = {};
+  bool allChecked = false;
 
   void filterItems(String searchTerm) {
-    filteredPantryItems = pantryItems
-        .where((item) =>
-            item.name.toLowerCase().contains(searchTerm.toLowerCase()) ||
-            item.productId != null &&
-                products
-                    .firstWhere((product) => product.id == item.productId)
-                    .name
-                    .toLowerCase()
-                    .contains(searchTerm.toLowerCase()))
-        .toList();
-    setState(() {
-      filteredPantryItems.sort((a, b) => a.name.compareTo(b.name));
+    // Clear existing lists
+    availableItems.clear();
+    unavailableItems.clear();
+    unknownQuantityItems.clear();
+
+    // Iterate over pantryItems and filter based on searchTerm
+    for (var item in pantryItems) {
+      bool matchesSearchTerm =
+          item.name.toLowerCase().contains(searchTerm.toLowerCase()) ||
+              (item.categoryId != null &&
+                  products.any((product) =>
+                      product.id == item.categoryId &&
+                      product.name
+                          .toLowerCase()
+                          .contains(searchTerm.toLowerCase())));
+
+      if (matchesSearchTerm) {
+        Map<String, double> quantities = item.getAvailableQuantity();
+        if (quantities.isEmpty) {
+          unknownQuantityItems.add(item);
+        } else if (quantities.values.any((element) => element > 0)) {
+          availableItems.add(item);
+        } else {
+          unavailableItems.add(item);
+        }
+      }
+    }
+
+    // Optionally, sort each list alphabetically by name
+    availableItems.sort((a, b) => a.name.compareTo(b.name));
+    unavailableItems.sort((a, b) => a.name.compareTo(b.name));
+    unknownQuantityItems.sort((a, b) => a.name.compareTo(b.name));
+
+    setState(() {});
+  }
+
+  List<PantryItem> sortByProductAndName(List<PantryItem> list) {
+    list.sort((a, b) {
+      String? productA =
+          products.firstWhereOrNull((p) => p.id == a.categoryId)?.name;
+      String? productB =
+          products.firstWhereOrNull((p) => p.id == b.categoryId)?.name;
+
+      if (productA == null) return -1;
+      if (productB == null) return 1;
+
+      int primaryComparison = productA.compareTo(productB);
+      if (primaryComparison != 0) return primaryComparison;
+      return a.name.compareTo(b.name);
     });
+
+    return list;
   }
 
   void loadData() async {
     await DatabaseService.getProducts();
-    pantryItems = await DatabaseService.getPantryItems();
+    PantryItemMap allPantryItems = await DatabaseService.getPantryItems();
+    pantryItems = allPantryItems.pantryItems;
+    missingIngredients = allPantryItems.missingIngredients;
     filterItems("");
 
     setState(() {
       products = DatabaseService.products;
+      products.sort((a, b) => a.name.compareTo(b.name));
       loading = false;
     });
   }
 
   void reserveItem(PantryItem item) async {
-    await DatabaseService.reservePantryItem(item.id!, !item.reserved);
+    PantryItem updatedPantryItem =
+        await DatabaseService.reservePantryItem(item.id!, !item.reserved);
+
+    Map<String, double> quantities = item.getAvailableQuantity();
+
     setState(() {
-      filteredPantryItems = filteredPantryItems
-          .map((pantryItem) => pantryItem.id == item.id
-              ? PantryItem(
-                  id: pantryItem.id,
-                  productId: pantryItem.productId,
-                  name: pantryItem.name,
-                  quantity: pantryItem.quantity,
-                  unit: pantryItem.unit,
-                  usages: pantryItem.usages,
-                  dateOfReceival: pantryItem.dateOfReceival,
-                  reserved: !pantryItem.reserved,
-                )
-              : pantryItem)
-          .toList();
+      if (quantities.isEmpty) {
+        unknownQuantityItems = unknownQuantityItems
+            .map((pantryItem) =>
+                pantryItem.id == item.id ? updatedPantryItem : pantryItem)
+            .toList();
+      } else if (quantities.values.any((element) => element > 0)) {
+        availableItems = availableItems
+            .map((pantryItem) =>
+                pantryItem.id == item.id ? updatedPantryItem : pantryItem)
+            .toList();
+      } else {
+        unavailableItems = unavailableItems
+            .map((pantryItem) =>
+                pantryItem.id == item.id ? updatedPantryItem : pantryItem)
+            .toList();
+      }
     });
+  }
+
+  void showEditItemDialog(BuildContext context, PantryItem? item,
+      List<ProductCategory> products) async {
+    final newItem = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) =>
+          EditPantryItemDialog(item: item, products: products),
+    );
+
+    // TO DO: improve performance by keeping list sorted when adding item
+    if (newItem != null) {
+      if (item == null) {
+        // If another PantryItem with the same name already exists: update that item instead of adding a new one
+        bool itemExists = pantryItems.any((item) =>
+            item.name.toLowerCase() == newItem['name']?.toLowerCase());
+        if (itemExists) {
+          // Update the existing item instead of adding a new one
+          PantryItem updatedItem = pantryItems.firstWhere((item) =>
+              item.name.toLowerCase() == newItem['name']?.toLowerCase());
+          DatabaseService.addPantryItemAmount(
+              updatedItem.id!, newItem['quantity'], newItem['unit']);
+          // Update the pantry item in the list
+          setState(() {
+            updatedItem.quantities.add(PantryItemQuantity(
+                quantity: newItem['quantity'],
+                unit: newItem['unit'],
+                dateOfReceival: newItem['date']));
+            filterItems(searchTerm);
+          });
+        } else {
+          // Add a new pantry item
+          PantryItem updatedItem = await DatabaseService.addPantryItem(
+              newItem['productId'],
+              newItem['name']?.toLowerCase(),
+              newItem['quantity'],
+              newItem['unit']?.toLowerCase(),
+              newItem['date'],
+              PantryItemStatus.inStock);
+          // Add to the list of pantry items
+          setState(() {
+            pantryItems.add(updatedItem);
+            filterItems(searchTerm);
+          });
+        }
+      } else {
+        PantryItem updatedItem = await DatabaseService.updatePantryItem(
+          item.id!,
+          newItem['productId'],
+          newItem['name']?.toLowerCase(),
+          newItem['quantity'],
+          newItem['unit']?.toLowerCase(),
+          newItem['date'],
+        );
+        // Update the pantry item in the list
+        setState(() {
+          pantryItems = pantryItems
+              .map((pantryItem) => pantryItem.id == item.id
+                  ? PantryItem(
+                      id: pantryItem.id,
+                      categoryId: updatedItem.categoryId,
+                      name: updatedItem.name,
+                      quantities: updatedItem.quantities,
+                      usages: updatedItem.usages,
+                      reserved: pantryItem.reserved,
+                    )
+                  : pantryItem)
+              .toList();
+          filterItems(searchTerm);
+        });
+      }
+    }
   }
 
   @override
   void initState() {
+    tabController = TabController(length: 2, vsync: this);
+    tabController!.addListener(() {
+      setState(() {}); // Forces widget to rebuild when active tab changes.
+    });
     super.initState();
     loadData();
+  }
+
+  @override
+  void dispose() {
+    tabController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -78,271 +217,301 @@ class PantryPageState extends State<PantryPage> {
     return Scaffold(
         appBar: AppBar(
           title: const Text('Voorraad'),
+          bottom: TabBar(
+            controller: tabController,
+            tabs: const <Tab>[
+              Tab(text: 'Aanwezig'),
+              Tab(text: 'Ontbrekend'),
+            ],
+          ),
         ),
         body: loading
             ? const CircularProgressIndicator()
-            : Column(children: [
-                TextField(
-                  onChanged: (value) {
-                    setState(() {
-                      filterItems(value);
-                    });
-                  },
-                  decoration: const InputDecoration(
-                    labelText: 'Search',
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                ),
-                Expanded(
-                    child: LayoutBuilder(
-                        builder: (context, constraints) =>
-                            SingleChildScrollView(
-                                scrollDirection: Axis.vertical,
-                                child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                        minWidth: constraints.maxWidth),
-                                    child: DataTable(
-                                      dataRowMaxHeight: double.infinity,
-                                      columns: const <DataColumn>[
-                                        DataColumn(label: Text('Product')),
-                                        DataColumn(
-                                          label: Text('Naam'),
-                                        ),
-                                        DataColumn(
-                                          label: Text('Aantal'),
-                                        ),
-                                        DataColumn(
-                                          label: Text('Gebruik'),
-                                        ),
-                                        DataColumn(label: Text('Acties'))
-                                      ],
-                                      rows: filteredPantryItems
-                                          .map((PantryItem item) {
-                                        return DataRow(cells: <DataCell>[
-                                          DataCell(Text(item.productId == null
-                                              ? ""
-                                              : products
-                                                  .firstWhere((product) =>
-                                                      product.id ==
-                                                      item.productId)
-                                                  .name)),
-                                          DataCell(Text(
-                                            item.name,
-                                            style: TextStyle(
-                                              decoration: item.reserved
-                                                  ? TextDecoration.lineThrough
-                                                  : null,
-                                            ),
-                                          )),
-                                          DataCell(Text(
-                                              item.quantity?.toString() ??
-                                                  ' ${item.unit ?? ''}')),
-                                          DataCell(
-                                            Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: item.usages
-                                                  .map<Widget>((usage) {
-                                                return Text(usage.toString());
-                                              }).toList(),
-                                            ),
-                                          ),
-                                          DataCell(
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: <Widget>[
-                                                IconButton(
-                                                    icon: Icon(item.reserved
-                                                        ? Icons.check_circle
-                                                        : Icons
-                                                            .circle_outlined),
-                                                    onPressed: () =>
-                                                        reserveItem(item)),
-                                                IconButton(
-                                                  icon: const Icon(Icons.edit),
-                                                  onPressed: () =>
-                                                      showEditItemDialog(
-                                                          context,
-                                                          item,
-                                                          products),
-                                                ),
-                                                IconButton(
-                                                  icon:
-                                                      const Icon(Icons.delete),
-                                                  onPressed: () async {
-                                                    bool confirm = await Dialogs
-                                                            .showConfirmationDialog(
-                                                          context,
-                                                          'Remove pantry item',
-                                                          'Are you sure you want to remove this pantry item?',
-                                                        ) ??
-                                                        false;
-                                                    if (confirm) {
-                                                      DatabaseService
-                                                          .deletePantryItem(item
-                                                              .id!); // Assume this method exists in DatabaseService
-                                                    }
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          )
-                                        ]);
-                                      }).toList(),
-                                    )))))
+            : TabBarView(controller: tabController, children: [
+                ItemList(
+                    rows: [
+                      ...getRows(availableItems),
+                      if (unknownQuantityItems.isNotEmpty)
+                        const DataRow(cells: [
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                        ]),
+                      ...getRows(unknownQuantityItems),
+                      if (unavailableItems.isNotEmpty)
+                        const DataRow(cells: [
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
+                        ]),
+                      ...getRows(unavailableItems)
+                    ],
+                    filterItems: filterItems,
+                    columns: const [
+                      'Acties',
+                      'Categorie',
+                      'Naam',
+                      'Totaal',
+                      'Beschikbaar',
+                      'Datum',
+                      'Gebruik'
+                    ]),
+                ItemList(
+                  rows: sortByProductAndName(missingIngredients)
+                      .map((item) => DataRow(cells: [
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  IconButton(
+                                      icon: Icon(
+                                          checkedItems.containsKey(item) &&
+                                                  checkedItems[item]!
+                                              ? Icons.check_box
+                                              : Icons.check_box_outline_blank),
+                                      onPressed: () => setState(() {
+                                            checkedItems[item] =
+                                                checkedItems.containsKey(item)
+                                                    ? !checkedItems[item]!
+                                                    : true;
+                                            if (allChecked) allChecked = false;
+                                          })),
+                                  // IconButton(
+                                  //   icon: const Icon(Icons.edit),
+                                  //   onPressed: () => showEditItemDialog(
+                                  //       context, item, products),
+                                  // ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete),
+                                    onPressed: () async {
+                                      bool confirm =
+                                          await Dialogs.showConfirmationDialog(
+                                                context,
+                                                'Remove pantry item',
+                                                'Are you sure you want to remove this pantry item?',
+                                              ) ??
+                                              false;
+                                      if (confirm) {
+                                        DatabaseService.deletePantryItem(item
+                                            .id!); // Assume this method exists in DatabaseService
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            DataCell(Text(item.name)),
+                            DataCell((Column(
+                                children: item
+                                    .getAvailableQuantity()
+                                    .entries
+                                    .map((entry) =>
+                                        Text('${entry.value} ${entry.key}'))
+                                    .toList()))),
+                            DataCell(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: item.usages
+                                    .expand<Widget>((usage) =>
+                                        usage.items.map((item) => SizedBox(
+                                              width: 400,
+                                              child: Text(
+                                                '${item.name}: ${usage.recipeName}',
+                                                overflow: TextOverflow.ellipsis,
+                                                softWrap: false,
+                                                maxLines: 1,
+                                              ),
+                                            )))
+                                    .toList(),
+                              ),
+                            ),
+                          ]))
+                      .toList(),
+                  filterItems: () => {},
+                  columns: [
+                    DataColumn(
+                        label: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                allChecked = !allChecked;
+                                for (var item in missingIngredients) {
+                                  checkedItems[item] = allChecked;
+                                }
+                              });
+                            },
+                            icon: Icon(allChecked
+                                ? Icons.check_box
+                                : Icons.check_box_outline_blank))),
+                    'Naam',
+                    'Aantal',
+                    'Gebruik'
+                  ],
+                )
               ]),
-        floatingActionButton: FloatingActionButton(
-            child: const Icon(Icons.add),
-            onPressed: () => showEditItemDialog(context, null, products)));
+        floatingActionButton: tabController?.index == 0
+            ? FloatingActionButton(
+                child: const Icon(Icons.add),
+                onPressed: () => showEditItemDialog(context, null, products))
+            : FloatingActionButton(
+                child: const Icon(Icons.add),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => PantryOrderPage(
+                            items: missingIngredients
+                                .where((item) =>
+                                    checkedItems.containsKey(item) &&
+                                    checkedItems[item]!)
+                                .toList())),
+                  );
+                }));
   }
 
   void navigateToRecipe(String recipeId) {}
+
+  List<DataRow> getRows(List<PantryItem> list) {
+    return list.map((PantryItem item) {
+      return DataRow(cells: <DataCell>[
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              IconButton(
+                  icon: Icon(item.reserved
+                      ? Icons.check_circle
+                      : Icons.circle_outlined),
+                  onPressed: () => reserveItem(item)),
+              IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () => showEditItemDialog(context, item, products),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete),
+                onPressed: () async {
+                  bool confirm = await Dialogs.showConfirmationDialog(
+                        context,
+                        'Remove pantry item',
+                        'Are you sure you want to remove this pantry item?',
+                      ) ??
+                      false;
+                  if (confirm) {
+                    DatabaseService.deletePantryItem(item.id!);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        // if (MediaQuery.of(context)
+        //         .size
+        //         .width >=
+        //     700)
+        DataCell(Text(item.categoryId == null
+            ? ""
+            : products
+                .firstWhere((product) => product.id == item.categoryId)
+                .name)),
+        DataCell(Text(
+          item.name,
+          style: TextStyle(
+            decoration: item.reserved ? TextDecoration.lineThrough : null,
+          ),
+        )),
+        DataCell(Column(
+            children: item.quantities
+                .map(
+                    (item) => Text('${item.quantity ?? ''} ${item.unit ?? ''}'))
+                .toList())),
+        DataCell((Column(
+            children: item
+                .getAvailableQuantity()
+                .entries
+                .map((entry) => Text('${entry.value} ${entry.key}'))
+                .toList()))),
+        DataCell(Column(
+            children: item.quantities
+                .map((quantity) => Text(quantity.getDaysOld()))
+                .toList())),
+        DataCell(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: item.usages
+                .expand<Widget>((usage) => usage.items.map((item) => SizedBox(
+                      width: 400,
+                      child: Text(
+                        '${item.name}: ${usage.recipeName}',
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                        maxLines: 1,
+                      ),
+                    )))
+                .toList(),
+          ),
+        ),
+      ]);
+    }).toList();
+  }
 }
 
-void showEditItemDialog(
-    BuildContext context, PantryItem? item, products) async {
-  String? productId = item?.productId;
-  final TextEditingController nameController =
-      TextEditingController(text: item?.name);
-  final TextEditingController quantityController =
-      TextEditingController(text: item?.quantity?.toString());
-  final TextEditingController unitController =
-      TextEditingController(text: item?.unit);
-  final TextEditingController dateController = TextEditingController(
-      text: formatDate(item?.dateOfReceival ?? DateTime.now()));
+class ItemList extends StatefulWidget {
+  final List columns;
+  final List<DataRow> rows;
+  final Function filterItems;
 
-  String? newProductName = "";
+  const ItemList(
+      {super.key,
+      required this.rows,
+      required this.filterItems,
+      required this.columns});
 
-  final newItem = await showDialog<Map<String, dynamic>>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(item == null ? 'Voeg item toe' : 'Pas item aan'),
-      content: Column(
-        children: [
-          DropdownButtonFormField<String>(
-            value: item?.productId,
-            items: products.map<DropdownMenuItem<String>>((Product product) {
-              return DropdownMenuItem<String>(
-                value: product.id,
-                child: Text(product.name),
-              );
-            }).toList(),
-            onChanged: (String? value) {
-              productId = value;
-            },
-            onSaved: (String? value) {
-              productId = value;
-            },
-            decoration: const InputDecoration(
-              labelText: 'Product',
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    title: const Text('Voeg nieuw product toe'),
-                    content: TextField(
-                      onChanged: (value) {
-                        newProductName = value;
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Naam',
-                      ),
-                    ),
-                    actions: <Widget>[
-                      TextButton(
-                        child: const Text('Annuleer'),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                      TextButton(
-                        child: const Text('Voeg toe'),
-                        onPressed: () async {
-                          DatabaseService.addProduct(newProductName!);
-                          DatabaseService.getProducts();
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-            child: const Text(
-              "+ Nieuw product",
-            ),
-          ),
-          TextField(
-            controller: nameController,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Naam'),
-          ),
-          TextField(
-            controller: quantityController,
-            decoration: const InputDecoration(labelText: 'Hoeveelheid'),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          ),
-          TextField(
-            controller: unitController,
-            decoration: const InputDecoration(labelText: 'Eenheid'),
-          ),
-          TextField(
-            controller: dateController,
-            decoration: const InputDecoration(labelText: 'Datum'),
-            onTap: () async {
-              DateTime? selectedDate = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now(),
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-              );
-              if (selectedDate != null) {
-                dateController.text = formatDate(selectedDate);
-              }
-            },
-          ),
-        ],
-      ),
-      actions: <Widget>[
-        TextButton(
-          child: const Text('Save'),
-          onPressed: () {
-            Navigator.of(context).pop({
-              'productId': productId,
-              'name': nameController.text,
-              'quantity':
-                  double.tryParse(quantityController.text.replaceAll(',', '.')),
-              'unit': unitController.text,
-              'date': dateController.text,
-            });
-          },
+  @override
+  State<ItemList> createState() => ItemListState();
+}
+
+class ItemListState extends State<ItemList> {
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      TextField(
+        autofocus: true, // Add this line to autofocus the field
+        onChanged: (value) {
+          setState(() {
+            widget.filterItems(value);
+          });
+        },
+        decoration: const InputDecoration(
+          labelText: 'Zoeken',
+          prefixIcon: Icon(Icons.search),
         ),
-      ],
-    ),
-  );
-
-  if (newItem != null) {
-    if (item == null) {
-      DatabaseService.addPantryItem(
-        newItem['productId'],
-        newItem['name'].toLowerCase(),
-        newItem['quantity'],
-        newItem['unit'].toLowerCase(),
-        newItem['date'],
-      );
-    } else {
-      DatabaseService.updatePantryItem(
-        item.id!,
-        newItem['productId'],
-        newItem['name'].toLowerCase(),
-        newItem['quantity'],
-        newItem['unit'].toLowerCase(),
-        newItem['date'],
-      );
-    }
+      ),
+      widget.rows.isEmpty
+          ? const Text('Er zijn geen items.')
+          : Expanded(
+              child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SingleChildScrollView(
+                          scrollDirection: Axis.vertical,
+                          child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                  minWidth: constraints.maxWidth),
+                              child: DataTable(
+                                  dataRowMaxHeight: double.infinity,
+                                  columns: widget.columns
+                                      .map((c) => c is String
+                                          ? DataColumn(label: Text(c))
+                                          : c as DataColumn)
+                                      .toList(),
+                                  rows: widget.rows))))))
+    ]);
   }
 }

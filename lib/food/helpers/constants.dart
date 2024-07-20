@@ -18,6 +18,7 @@ MealType mealTypeFromValue(String value) {
   switch (value.toLowerCase()) {
     case 'lunch':
       return MealType.lunch;
+    case 'diner':
     case 'dinner':
       return MealType.dinner;
     default:

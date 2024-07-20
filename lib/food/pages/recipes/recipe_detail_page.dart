@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mealtime/food/types/recipe.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class RecipeDetailPage extends StatefulWidget {
   final Recipe recipe;
@@ -11,34 +12,74 @@ class RecipeDetailPage extends StatefulWidget {
 }
 
 class RecipeDetailPageState extends State<RecipeDetailPage> {
+  Widget getSourceWidget() {
+    Uri? uri = Uri.tryParse(widget.recipe.source);
+    return Row(children: [
+      const Text('Bron: ',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      if (uri?.hasAbsolutePath ?? false)
+        InkWell(
+          child: Text(
+            widget.recipe.source,
+            style: const TextStyle(
+                color: Colors.blue, decoration: TextDecoration.underline),
+          ),
+          onTap: () async {
+            if (await canLaunchUrl(uri!)) {
+              await launchUrl(uri); // TO DO: this is not working
+            } else {
+              throw 'Could not launch $uri';
+            }
+          },
+        )
+      else
+        Text(widget.recipe.source)
+    ]);
+    // Any other widgets...
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.recipe.name),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text('Source: ${widget.recipe.source}',
-                style: const TextStyle(fontSize: 18)),
-            Text('Portions: ${widget.recipe.portions}',
-                style: const TextStyle(fontSize: 18)),
-            Text('Types: ${widget.recipe.types.join(', ')}',
-                style: const TextStyle(fontSize: 18)),
-            const Text('Ingredients:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            for (var ingredient in widget.recipe.ingredients)
-              Text(ingredient.name, style: const TextStyle(fontSize: 16)),
-            const Text('Steps:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            for (var step in widget.recipe.preparation)
-              Text(step, style: const TextStyle(fontSize: 16)),
-          ],
-        ),
-      ),
+      body: SizedBox(
+          width: MediaQuery.of(context).size.width,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(30.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  getSourceWidget(),
+                  Text(
+                    'Porties: ${widget.recipe.portions}',
+                  ),
+                  Text(
+                    'Soort: ${widget.recipe.types.join(', ')}',
+                  ),
+                  const SizedBox(
+                    height: 10,
+                  ),
+                  const Text('Ingrediënten:',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  for (var ingredient in widget.recipe.ingredients)
+                    Text("- ${ingredient.ingredient}",
+                        style: const TextStyle(fontSize: 16)),
+                  const SizedBox(
+                    height: 10,
+                  ),
+                  const Text('Stappen:',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  for (var step in widget.recipe.preparation)
+                    Text("- $step", style: const TextStyle(fontSize: 16)),
+                ],
+              ),
+            ),
+          )),
     );
   }
 }

@@ -35,7 +35,7 @@ class EditRecipePageState extends State<EditRecipePage> {
       types = widget.recipe!.types;
       _ingredientsController.text = widget.recipe!.ingredients
           .map(
-            (e) => e.name,
+            (e) => e.ingredient,
           )
           .join('\n');
       _stepsController.text = widget.recipe!.preparation.join('\n');
@@ -83,72 +83,75 @@ class EditRecipePageState extends State<EditRecipePage> {
         title: Text(
             widget.recipe != null ? 'Recept bewerken' : 'Recept toevoegen'),
       ),
-      body: Form(
-        key: _formKey,
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Naam'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vul een naam in';
-                  }
-                  return null;
-                },
+      body: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: Form(
+            key: _formKey,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(labelText: 'Naam'),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Vul een naam in';
+                      }
+                      return null;
+                    },
+                  ),
+                  TextFormField(
+                    controller: _sourceController,
+                    decoration: const InputDecoration(labelText: 'Bron'),
+                  ),
+                  TextFormField(
+                    controller: _portionsController,
+                    decoration: const InputDecoration(labelText: 'Porties'),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Vul het aantal porties in'; // 'Please enter the number of portions' in Dutch
+                      }
+                      return null;
+                    },
+                  ),
+                  DropdownSearch<MealType>.multiSelection(
+                    items: MealType.values.toList(),
+                    itemAsString: (MealType type) => type.label,
+                    selectedItems: types,
+                    onChanged: (List<MealType>? newValues) {
+                      if (newValues != null) {
+                        setState(() {
+                          types = newValues;
+                        });
+                      }
+                    },
+                  ),
+                  TextFormField(
+                    controller: _ingredientsController,
+                    decoration:
+                        const InputDecoration(labelText: 'Ingrediënten'),
+                    keyboardType: TextInputType.multiline,
+                    maxLines: null,
+                    minLines: 5, // Add this line to make the text field bigger
+                  ),
+                  TextFormField(
+                      controller: _stepsController,
+                      decoration: const InputDecoration(labelText: 'Stappen'),
+                      keyboardType: TextInputType.multiline,
+                      maxLines: null,
+                      minLines: 5),
+                  ElevatedButton(
+                    onPressed: _addRecipe,
+                    child: Text(widget.recipe != null
+                        ? 'Recept Bijwerken'
+                        : 'Recept Toevoegen'), // 'Update Recipe' or 'Add Recipe' in Dutch
+                  ),
+                ],
               ),
-              TextFormField(
-                controller: _sourceController,
-                decoration: const InputDecoration(labelText: 'Bron'),
-              ),
-              TextFormField(
-                controller: _portionsController,
-                decoration: const InputDecoration(labelText: 'Porties'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vul het aantal porties in'; // 'Please enter the number of portions' in Dutch
-                  }
-                  return null;
-                },
-              ),
-              DropdownSearch<MealType>.multiSelection(
-                items: MealType.values.toList(),
-                itemAsString: (MealType type) => type.label,
-                selectedItems: types,
-                onChanged: (List<MealType>? newValues) {
-                  if (newValues != null) {
-                    setState(() {
-                      types = newValues;
-                    });
-                  }
-                },
-              ),
-              TextFormField(
-                controller: _ingredientsController,
-                decoration: const InputDecoration(labelText: 'Ingrediënten'),
-                keyboardType: TextInputType.multiline,
-                maxLines: null,
-                minLines: 5, // Add this line to make the text field bigger
-              ),
-              TextFormField(
-                  controller: _stepsController,
-                  decoration: const InputDecoration(labelText: 'Stappen'),
-                  keyboardType: TextInputType.multiline,
-                  maxLines: null,
-                  minLines: 5),
-              ElevatedButton(
-                onPressed: _addRecipe,
-                child: Text(widget.recipe != null
-                    ? 'Recept Bijwerken'
-                    : 'Recept Toevoegen'), // 'Update Recipe' or 'Add Recipe' in Dutch
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
+          )),
     );
   }
 }

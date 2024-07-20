@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:mealtime/food/helpers/constants.dart';
 import 'package:mealtime/food/helpers/database.dart';
 import 'package:mealtime/food/helpers/utils.dart';
+import 'package:mealtime/food/types/pantry_item.dart';
 
 class PresencePage extends StatefulWidget {
   const PresencePage({super.key});
@@ -24,6 +25,8 @@ class PresencePageState extends State<PresencePage> {
     MealType.dinner: {},
   };
   bool dataExists = false;
+  List<PantryItem> pantryItems = [];
+  List<PantryItem> defaultPantryItems = [];
 
   /*
    * This function sets the default presence for every day in the daysInRange list.
@@ -58,6 +61,18 @@ class PresencePageState extends State<PresencePage> {
     setState(() {
       loading = true;
     });
+    PantryItemMap pantryItemMap = await DatabaseService.getPantryItems();
+    for (var item in pantryItemMap.pantryItems) {
+      if (item.getAvailableQuantity().entries.any((entry) => entry.value > 0)) {
+        pantryItems.add(item);
+      } else if (!(item
+          .getAvailableQuantity()
+          .entries
+          .any((entry) => entry.value <= 0))) {
+        defaultPantryItems.add(item);
+      }
+    }
+
     setDefaultPresence();
     // Get the firestore document for every day in range
     // If the document exists, set the presence for that day
@@ -148,14 +163,24 @@ class PresencePageState extends State<PresencePage> {
     return counts.entries.map((e) => '${e.value}x ${e.key}').join(', ');
   }
 
-  String generatePantryList(List<DocumentSnapshot> documents) {
+  String quantitiesToString(Map<String, double> quantities) {
+    return quantities.isEmpty
+        ? "onbekend"
+        : quantities.entries
+            .map((entry) => '${entry.value} ${entry.key}')
+            .join(', ');
+  }
+
+// TO DO: update quantities + units for multiple quantities
+  String generatePantryList(
+      List<PantryItem> pantryItems, List<PantryItem> defaultPantryItems) {
     String template =
-        "Ik heb recepten nodig voor ${presenceListToString()}. Ik wil graag één recept per keer kiezen. Ik heb de volgende ingrediënten in huis:\n\n";
-    return template +
-        documents.map((document) {
-          Map<String, dynamic> data = document.data() as Map<String, dynamic>;
-          return '${data['name']}: ${data['quantity']} ${data['unit']}';
-        }).join('\n');
+        "Ik heb recepten nodig voor ${presenceListToString()}. Ik wil graag één recept per keer kiezen. Ik wil dat een lunch minstens 400kcal bevat en een diner minstens 500 kcal. Ik heb de volgende ingrediënten in huis:\n\n";
+    return '$template${pantryItems.map((pantryItem) {
+      return '${pantryItem.name}: ${quantitiesToString(pantryItem.getAvailableQuantity())}';
+    }).join('\n')}\n\nVerder heb ik ook de volgende ingrediënten standaard in huis die gebruikt kunnen worden, maar niet hoeven te worden:\n\n${defaultPantryItems.map((pantryItem) {
+      return pantryItem.name;
+    }).join('\n')}';
   }
 
   @override
@@ -167,93 +192,132 @@ class PresencePageState extends State<PresencePage> {
 
   @override
   Widget build(BuildContext context) {
-    final DatabaseService dbService = DatabaseService();
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Aanwezigheid'),
-        actions: <Widget>[
-          ElevatedButton(
-            onPressed: savePresenceData,
-            style: ButtonStyle(
-              backgroundColor: MaterialStateProperty.resolveWith<Color>(
-                (Set<MaterialState> states) {
-                  if (dataExists) return Colors.green;
-                  return Colors.transparent; // Use the component's default.
-                },
+        appBar: AppBar(
+          title: const Text('Aanwezigheid'),
+          actions: <Widget>[
+            ElevatedButton(
+              onPressed: savePresenceData,
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.resolveWith<Color>(
+                  (Set<MaterialState> states) {
+                    if (dataExists) return Colors.green;
+                    return Colors.transparent; // Use the component's default.
+                  },
+                ),
               ),
+              child: const Text("Opslaan"),
             ),
-            child: const Text("Opslaan"),
-          ),
-        ],
-      ),
-      body: Center(
-          child: loading
-              ? const CircularProgressIndicator()
-              : Column(children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            daysInRange = getDaysInRange(
-                                DateTime.parse(daysInRange.first)
-                                    .add(const Duration(days: -7)),
-                                DateTime.parse(daysInRange.last)
-                                    .add(const Duration(days: -7)));
-                          });
-                          loadPresenceData();
-                        },
-                        child: const Text('Vorige periode'),
-                      ),
-                      const SizedBox(width: 20),
-                      Text(getWeekLabel()),
-                      const SizedBox(width: 20),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            daysInRange = getDaysInRange(
-                                DateTime.parse(daysInRange.first)
-                                    .add(const Duration(days: 7)),
-                                DateTime.parse(daysInRange.last)
-                                    .add(const Duration(days: 7)));
-                          });
-                          loadPresenceData();
-                        },
-                        child: const Text('Volgende periode'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  countPresenceAtMeals(),
-                  const SizedBox(height: 20),
-                  Expanded(
-                      child: ListView.builder(
-                    itemCount: daysInRange.length,
-                    itemBuilder: (context, index) {
-                      String day = daysInRange[index];
-                      String dayLabel = DateFormat('EEE d MMMM', 'nl_NL')
-                          .format(DateTime.parse(day));
-                      return Card(
-                        child: ListTile(
-                          title: Text(dayLabel[0].toUpperCase() +
-                              dayLabel.substring(1)),
-                          subtitle: Column(
-                            children: [
-                              if (day != daysInRange.first ||
-                                  startMeal == MealType.lunch)
-                                Row(children: [
-                                  const SizedBox(
-                                      width: 100, child: Text('Lunch')),
-                                  const SizedBox(width: 10),
-                                  SizedBox(
+          ],
+        ),
+        body: Center(
+            child: loading
+                ? const CircularProgressIndicator()
+                : Column(children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              daysInRange = getDaysInRange(
+                                  DateTime.parse(daysInRange.first)
+                                      .add(const Duration(days: -7)),
+                                  DateTime.parse(daysInRange.last)
+                                      .add(const Duration(days: -7)));
+                            });
+                            loadPresenceData();
+                          },
+                          child: const Text('Vorige periode'),
+                        ),
+                        const SizedBox(width: 20),
+                        Text(getWeekLabel()),
+                        const SizedBox(width: 20),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              daysInRange = getDaysInRange(
+                                  DateTime.parse(daysInRange.first)
+                                      .add(const Duration(days: 7)),
+                                  DateTime.parse(daysInRange.last)
+                                      .add(const Duration(days: 7)));
+                            });
+                            loadPresenceData();
+                          },
+                          child: const Text('Volgende periode'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    countPresenceAtMeals(),
+                    const SizedBox(height: 20),
+                    Expanded(
+                        child: ListView.builder(
+                      itemCount: daysInRange.length,
+                      itemBuilder: (context, index) {
+                        String day = daysInRange[index];
+                        String dayLabel = DateFormat('EEE d MMMM', 'nl_NL')
+                            .format(DateTime.parse(day));
+                        return Card(
+                          child: ListTile(
+                            title: Text(dayLabel[0].toUpperCase() +
+                                dayLabel.substring(1)),
+                            subtitle: Column(
+                              children: [
+                                if (day != daysInRange.first ||
+                                    startMeal == MealType.lunch)
+                                  Row(children: [
+                                    const SizedBox(
+                                        width: 100, child: Text('Lunch')),
+                                    const SizedBox(width: 10),
+                                    SizedBox(
+                                        width: 200,
+                                        child:
+                                            DropdownButtonFormField<Presence>(
+                                          value: selectedMeals[MealType.lunch]![
+                                              day]!,
+                                          decoration: InputDecoration(
+                                            // Add Horizontal padding using menuItemStyleData.padding so it matches
+                                            // the menu padding when button's width is not specified.
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                    horizontal: 12),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                            ),
+                                            // Add more decoration..
+                                          ),
+                                          items: Presence.values
+                                              .map<DropdownMenuItem<Presence>>(
+                                                  (Presence presence) {
+                                            return DropdownMenuItem<Presence>(
+                                              value: presence,
+                                              child: Text(presence.value),
+                                            );
+                                          }).toList(),
+                                          onChanged: (Presence? newValue) {
+                                            setState(() {
+                                              selectedMeals[MealType.lunch]![
+                                                  day] = newValue!;
+                                            });
+                                          },
+                                        ))
+                                  ]),
+                                const SizedBox(height: 10),
+                                if (day != daysInRange.last ||
+                                    startMeal == MealType.lunch)
+                                  Row(children: [
+                                    const SizedBox(
+                                        width: 100, child: Text('Diner')),
+                                    const SizedBox(width: 10),
+                                    SizedBox(
                                       width: 200,
                                       child: DropdownButtonFormField<Presence>(
-                                        value: selectedMeals[MealType.lunch]![
+                                        value: selectedMeals[MealType.dinner]![
                                             day]!,
                                         decoration: InputDecoration(
-                                          // Add Horizontal padding using menuItemStyleData.padding so it matches
-                                          // the menu padding when button's width is not specified.
                                           contentPadding:
                                               const EdgeInsets.symmetric(
                                                   vertical: 12, horizontal: 12),
@@ -261,7 +325,6 @@ class PresencePageState extends State<PresencePage> {
                                             borderRadius:
                                                 BorderRadius.circular(15),
                                           ),
-                                          // Add more decoration..
                                         ),
                                         items: Presence.values
                                             .map<DropdownMenuItem<Presence>>(
@@ -273,79 +336,35 @@ class PresencePageState extends State<PresencePage> {
                                         }).toList(),
                                         onChanged: (Presence? newValue) {
                                           setState(() {
-                                            selectedMeals[MealType.lunch]![
+                                            selectedMeals[MealType.dinner]![
                                                 day] = newValue!;
                                           });
                                         },
-                                      ))
-                                ]),
-                              const SizedBox(height: 10),
-                              if (day != daysInRange.last ||
-                                  startMeal == MealType.lunch)
-                                Row(children: [
-                                  const SizedBox(
-                                      width: 100, child: Text('Diner')),
-                                  const SizedBox(width: 10),
-                                  SizedBox(
-                                    width: 200,
-                                    child: DropdownButtonFormField<Presence>(
-                                      value:
-                                          selectedMeals[MealType.dinner]![day]!,
-                                      decoration: InputDecoration(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                vertical: 12, horizontal: 12),
-                                        border: OutlineInputBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(15),
-                                        ),
                                       ),
-                                      items: Presence.values
-                                          .map<DropdownMenuItem<Presence>>(
-                                              (Presence presence) {
-                                        return DropdownMenuItem<Presence>(
-                                          value: presence,
-                                          child: Text(presence.value),
-                                        );
-                                      }).toList(),
-                                      onChanged: (Presence? newValue) {
-                                        setState(() {
-                                          selectedMeals[MealType.dinner]![day] =
-                                              newValue!;
-                                        });
-                                      },
                                     ),
-                                  ),
-                                ]),
-                            ],
+                                  ]),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ))
-                ])),
-      floatingActionButton: StreamBuilder<QuerySnapshot>(
-        stream: DatabaseService.getPantryItemStream(),
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            return FloatingActionButton(
-              child: Image.asset('assets/images/chatgpt_logo.png'),
-              onPressed: () {
-                String pantryList = generatePantryList(snapshot.data!.docs);
-                FlutterClipboard.copy(pantryList);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Pantry list copied to clipboard'),
-                    backgroundColor: Colors.teal,
-                  ),
-                );
-              },
-            );
-          } else {
-            return Container(); // Return an empty container when there's no data
-          }
-        },
-      ),
-    );
+                        );
+                      },
+                    ))
+                  ])),
+        floatingActionButton: pantryItems.isNotEmpty
+            ? FloatingActionButton(
+                child: Image.asset('assets/images/chatgpt_logo.png'),
+                onPressed: () {
+                  String pantryList =
+                      generatePantryList(pantryItems, defaultPantryItems);
+                  FlutterClipboard.copy(pantryList);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Pantry list copied to clipboard'),
+                      backgroundColor: Colors.teal,
+                    ),
+                  );
+                },
+              )
+            : Container());
   }
 }

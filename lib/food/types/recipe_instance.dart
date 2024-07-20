@@ -1,31 +1,26 @@
 import 'package:mealtime/food/helpers/constants.dart';
 import 'package:mealtime/food/types/ingredient.dart';
+import 'package:mealtime/food/types/recipe.dart';
 
-class RecipeInstance {
-  String? id;
+class RecipeInstance extends Recipe {
   String recipeId;
   RecipeStatus status;
   List<DateTime> plannedDates;
-  String name;
-  String source;
-  int portions;
-  List<MealType> types;
-  List<Ingredient> ingredients;
-  List<String> steps;
 
   RecipeInstance({
-    this.id,
+    super.id,
     required this.recipeId,
     required this.status,
     required this.plannedDates,
-    required this.name,
-    required this.source,
-    required this.portions,
-    required this.types,
-    required this.ingredients,
-    required this.steps,
+    required super.name,
+    required super.source,
+    required super.portions,
+    required super.types,
+    required super.ingredients,
+    required super.preparation,
   });
 
+  @override
   Map<String, dynamic> toJson() {
     return {
       'recipeId': recipeId,
@@ -37,7 +32,7 @@ class RecipeInstance {
       'portions': portions,
       'types': types.map((e) => e.name).toList(),
       'ingredients': ingredients,
-      'steps': steps,
+      'steps': preparation,
     };
   }
 
@@ -61,7 +56,7 @@ class RecipeInstance {
             return Ingredient.fromJson(ingredient);
           }).toList() ??
           [],
-      steps: List<String>.from(object['preparation'] ?? []),
+      preparation: List<String>.from(object['preparation'] ?? []),
     );
   }
 }
