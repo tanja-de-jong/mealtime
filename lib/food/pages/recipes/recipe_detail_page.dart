@@ -75,7 +75,8 @@ class RecipeDetailPageState extends State<RecipeDetailPage> {
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   for (var step in widget.recipe.preparation)
-                    Text("- $step", style: const TextStyle(fontSize: 16)),
+                    Text("${step.trim() == "" ? "" : "- "}$step",
+                        style: const TextStyle(fontSize: 16)),
                 ],
               ),
             ),
