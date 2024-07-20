@@ -19,11 +19,11 @@ class EditPantryItemDialogState extends State<EditPantryItemDialog> {
   List<ProductCategory> products = [];
   String? productId;
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController quantityController = TextEditingController();
-  final TextEditingController unitController = TextEditingController();
-  final TextEditingController dateController = TextEditingController();
+  final List<TextEditingController> quantityControllers = [];
+  final List<TextEditingController> unitControllers = [];
+  final List<TextEditingController> dateControllers = [];
   final TextEditingController productController = TextEditingController();
-  DateTime? selectedDate = DateTime.now();
+  List<DateTime?> selectedDates = [];
 
   String? newProductName = "";
 
@@ -33,15 +33,49 @@ class EditPantryItemDialogState extends State<EditPantryItemDialog> {
     products = widget.products;
     if (widget.item != null) {
       nameController.text = widget.item!.name;
-      quantityController.text =
-          widget.item!.quantities[0].quantity?.toString() ?? '';
-      unitController.text = widget.item!.quantities[0].unit ?? "";
-      dateController.text = formatDate(
-          widget.item!.quantities[0].dateOfReceival ?? DateTime.now());
+      // If there are no quantities, add an empty one
+      if (widget.item!.quantities.isEmpty) {
+        widget.item!.quantities.add(PantryItemQuantity());
+      }
+      for (var quantity in widget.item!.quantities) {
+        TextEditingController quantityController = TextEditingController();
+        TextEditingController unitController = TextEditingController();
+        TextEditingController dateController = TextEditingController();
+
+        quantityController.text = quantity.quantity?.toString() ?? '';
+        unitController.text = quantity.unit ?? "";
+        dateController.text =
+            formatDate(quantity.dateOfReceival ?? DateTime.now());
+        selectedDates.add(quantity.dateOfReceival ?? DateTime.now());
+
+        addQuantityControllers(
+            quantityController, unitController, dateController);
+      }
       productId = widget.item!.categoryId;
+      productController.text =
+          products.firstWhere((product) => product.id == productId).name;
     } else {
-      dateController.text = formatDate(DateTime.now());
+      addEmptyQuantity();
     }
+  }
+
+  void addQuantityControllers(
+      TextEditingController quantityController,
+      TextEditingController unitController,
+      TextEditingController dateController) {
+    quantityControllers.add(quantityController);
+    unitControllers.add(unitController);
+    dateControllers.add(dateController);
+    selectedDates.add(DateTime.now());
+  }
+
+  void addEmptyQuantity() {
+    TextEditingController quantityController = TextEditingController();
+    TextEditingController unitController = TextEditingController();
+    TextEditingController dateController = TextEditingController();
+    dateController.text = formatDate(DateTime.now());
+
+    addQuantityControllers(quantityController, unitController, dateController);
   }
 
   @override
@@ -109,6 +143,7 @@ class EditPantryItemDialogState extends State<EditPantryItemDialog> {
                           // Product already exists
                           if (product != null) {
                             setState(() {
+                              // TO DO: this does not work, because no context
                               productId = product.id;
                               nameController.text = products
                                   .firstWhere((p) => p.id == productId)
@@ -149,30 +184,45 @@ class EditPantryItemDialogState extends State<EditPantryItemDialog> {
             autofocus: true,
             decoration: const InputDecoration(labelText: 'Naam'),
           ),
-          TextField(
-            controller: quantityController,
-            decoration: const InputDecoration(labelText: 'Hoeveelheid'),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          ),
-          TextField(
-            controller: unitController,
-            decoration: const InputDecoration(labelText: 'Eenheid'),
-          ),
-          TextField(
-            controller: dateController,
-            decoration: const InputDecoration(labelText: 'Datum'),
-            onTap: () async {
-              selectedDate = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now(),
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-              );
-              setState(() {
-                dateController.text = formatDate(selectedDate!);
-              });
+          for (int i = 0; i < quantityControllers.length; i++)
+            Column(
+              children: [
+                TextField(
+                  controller: quantityControllers[i],
+                  decoration: const InputDecoration(labelText: 'Hoeveelheid'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                TextField(
+                  controller: unitControllers[i],
+                  decoration: const InputDecoration(labelText: 'Eenheid'),
+                ),
+                TextField(
+                  controller: dateControllers[i],
+                  decoration: const InputDecoration(labelText: 'Datum'),
+                  onTap: () async {
+                    selectedDates[i] = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    setState(() {
+                      dateControllers[i].text = formatDate(selectedDates[i]!);
+                    });
+                  },
+                ),
+              ],
+            ),
+          TextButton(
+            onPressed: () {
+              addEmptyQuantity();
+              setState(() {});
             },
-          ),
+            child: const Text(
+              "+ Hoeveelheid toevoegen",
+            ),
+          )
         ],
       ),
       actions: <Widget>[
@@ -182,12 +232,19 @@ class EditPantryItemDialogState extends State<EditPantryItemDialog> {
             Navigator.of(context).pop({
               'productId': productId,
               'name': nameController.text,
-              'quantity': quantityController.text == ''
-                  ? null
-                  : double.tryParse(
-                      quantityController.text.replaceAll(',', '.')),
-              'unit': unitController.text == '' ? null : unitController.text,
-              'date': selectedDate,
+              'quantities': quantityControllers
+                  .map((controller) => {
+                        'quantity': controller.text == ''
+                            ? null
+                            : double.tryParse(
+                                controller.text.replaceAll(',', '.')),
+                        'unit': unitControllers[
+                                quantityControllers.indexOf(controller)]
+                            .text,
+                        'dateOfReceival': selectedDates[
+                            quantityControllers.indexOf(controller)]
+                      })
+                  .toList(),
             });
           },
         ),

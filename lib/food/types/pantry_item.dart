@@ -120,12 +120,14 @@ class PantryItem {
     };
     Map<String, double> result = {};
     for (String unit in units) {
-      double quantity = quantities
-              .firstWhereOrNull((quantity) => quantity.unit == unit)
-              ?.quantity ??
-          0;
+      double totalQuantity = 0;
+      for (PantryItemQuantity quantity in quantities) {
+        if (quantity.unit == unit && quantity.quantity != null) {
+          totalQuantity += quantity.quantity!;
+        }
+      }
       double? usage = usagesByUnit[unit];
-      result[unit] = quantity - (usage ?? 0);
+      result[unit] = totalQuantity - (usage ?? 0);
     }
     return result;
   }

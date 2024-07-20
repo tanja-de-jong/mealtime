@@ -105,12 +105,9 @@ class RecipeToPantryLinkerWidgetState
           id: ingredients.indexOf(ingredient).toString(),
           categoryId: newItem['productId'],
           name: newItem['name'].toLowerCase(),
-          quantities: [
-            PantryItemQuantity(
-              quantity: newItem['quantity'],
-              unit: newItem['unit']?.toLowerCase(),
-            ),
-          ],
+          quantities: newItem['quantities']
+              .map((q) => PantryItemQuantity.fromJson(q))
+              .toList(),
           status: PantryItemStatus.needed);
 
       setState(() {
@@ -275,9 +272,7 @@ class RecipeToPantryLinkerWidgetState
             PantryItem missingIngredient = await DatabaseService.addPantryItem(
                 pantryItem.categoryId!,
                 pantryItem.name,
-                pantryItem.quantities[0].quantity!,
-                pantryItem.quantities[0].unit!,
-                null,
+                pantryItem.quantities,
                 PantryItemStatus.needed);
 
             ingredients[int.parse(pantryItem.id!)].pantryItems = [

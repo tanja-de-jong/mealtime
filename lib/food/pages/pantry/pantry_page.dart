@@ -157,9 +157,7 @@ class PantryPageState extends State<PantryPage>
           PantryItem updatedItem = await DatabaseService.addPantryItem(
               newItem['productId'],
               newItem['name']?.toLowerCase(),
-              newItem['quantity'],
-              newItem['unit']?.toLowerCase(),
-              newItem['date'],
+              newItem['quantities'],
               PantryItemStatus.inStock);
           // Add to the list of pantry items
           setState(() {
@@ -172,9 +170,7 @@ class PantryPageState extends State<PantryPage>
           item.id!,
           newItem['productId'],
           newItem['name']?.toLowerCase(),
-          newItem['quantity'],
-          newItem['unit']?.toLowerCase(),
-          newItem['date'],
+          newItem['quantities'],
         );
         // Update the pantry item in the list
         setState(() {

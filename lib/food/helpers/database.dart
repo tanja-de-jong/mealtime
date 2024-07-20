@@ -62,29 +62,16 @@ class DatabaseService {
   }
 
   static Future<PantryItem> updatePantryItem(
-      String id,
-      String productId,
-      String? name,
-      double? newQuantity,
-      String? newUnit,
-      DateTime? newDate) async {
+      String id, String productId, String? name, List quantities) async {
     await pantry.doc(id).update({
       'productId': productId,
       'name': name,
-      'quantities': [
-        {
-          'quantity': newQuantity,
-          'unit': newUnit,
-          'dateOfReceival': newDate,
-        }
-      ],
+      'quantities': quantities,
     });
     return PantryItem.fromJson(id, {
       'productId': productId,
       'name': name,
-      'quantities': [
-        {'quantity': newQuantity, 'unit': newUnit, 'dateOfReceival': newDate}
-      ],
+      'quantities': quantities,
     });
   }
 
@@ -107,15 +94,13 @@ class DatabaseService {
     }
   }
 
-  static Future<PantryItem> addPantryItem(String productId, String name,
-      double quantity, String unit, DateTime? date, PantryItemStatus status) {
+  static Future<PantryItem> addPantryItem(
+      String productId, String name, List quantities, PantryItemStatus status) {
     var data = {
       'productId': productId,
       'name': name,
       'status': status.name,
-      'quantities': [
-        {'quantity': quantity, 'unit': unit, 'date': date}
-      ]
+      'quantities': quantities
     };
 
     return pantry.add(data).then((docRef) {
