@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mealtime/food/helpers/constants.dart';
 import 'package:mealtime/food/types/recipe.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -57,7 +58,7 @@ class RecipeDetailPageState extends State<RecipeDetailPage> {
                     'Porties: ${widget.recipe.portions}',
                   ),
                   Text(
-                    'Soort: ${widget.recipe.types.join(', ')}',
+                    'Soort: ${widget.recipe.types.map((type) => type.label).join(', ')}',
                   ),
                   const SizedBox(
                     height: 10,
