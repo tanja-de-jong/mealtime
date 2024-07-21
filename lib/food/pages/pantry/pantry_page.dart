@@ -4,6 +4,7 @@ import 'package:mealtime/food/pages/pantry/edit_pantry_item_dialog.dart';
 import 'package:mealtime/food/pages/pantry/pantry_order_page.dart';
 import 'package:mealtime/food/types/pantry_item.dart';
 import 'package:mealtime/food/types/product.dart';
+import 'package:mealtime/food/widgets/search_bar.dart';
 import 'package:mealtime/general/dialogs.dart';
 
 import '../../helpers/database.dart'; // Import the file containing the DatabaseService class
@@ -475,17 +476,12 @@ class ItemListState extends State<ItemList> {
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      TextField(
-        autofocus: true, // Add this line to autofocus the field
-        onChanged: (value) {
+      GenericSearchBar(
+        onSearchChanged: (value) {
           setState(() {
             widget.filterItems(value);
           });
         },
-        decoration: const InputDecoration(
-          labelText: 'Zoeken',
-          prefixIcon: Icon(Icons.search),
-        ),
       ),
       widget.rows.isEmpty
           ? const Text('Er zijn geen items.')

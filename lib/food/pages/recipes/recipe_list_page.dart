@@ -6,6 +6,7 @@ import 'package:mealtime/food/pages/recipes/recipe_detail_page.dart';
 import 'package:mealtime/food/pages/recipes/recipe_to_pantry_linker_page.dart';
 import 'package:mealtime/food/types/recipe.dart';
 import 'package:mealtime/food/types/recipe_instance.dart';
+import 'package:mealtime/food/widgets/search_bar.dart';
 import 'package:mealtime/general/dialogs.dart';
 
 class RecipeListPage extends StatefulWidget {
@@ -36,6 +37,27 @@ class RecipeListPageState extends State<RecipeListPage>
       filteredRecipeInstances = [...recipeInstances];
       loading = false;
     });
+  }
+
+  void filterItems(
+      List<Recipe> allItems, List<Recipe> filteredItems, String searchTerm) {
+    // Clear existing lists
+    filteredItems.clear();
+
+    // Iterate over pantryItems and filter based on searchTerm
+    for (var item in allItems) {
+      bool matchesSearchTerm =
+          item.name.toLowerCase().contains(searchTerm.toLowerCase());
+
+      if (matchesSearchTerm) {
+        filteredItems.add(item);
+      }
+    }
+
+    // Optionally, sort each list alphabetically by name
+    filteredItems.sort((a, b) => a.name.compareTo(b.name));
+
+    setState(() {});
   }
 
   void addInstance(Recipe recipe) async {
@@ -117,150 +139,172 @@ class RecipeListPageState extends State<RecipeListPage>
       body: loading
           ? const CircularProgressIndicator()
           : TabBarView(controller: tabController, children: [
-              ListView(
-                children: filteredRecipeInstances
-                    .map((RecipeInstance recipeInstance) {
-                  return InkWell(
-                      onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  RecipeDetailPage(recipe: recipeInstance),
+              Column(children: [
+                GenericSearchBar(
+                  onSearchChanged: (value) {
+                    setState(() {
+                      filterItems(
+                          recipeInstances, filteredRecipeInstances, value);
+                    });
+                  },
+                ),
+                Expanded(
+                    child: ListView(
+                  children: filteredRecipeInstances
+                      .map((RecipeInstance recipeInstance) {
+                    return InkWell(
+                        onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    RecipeDetailPage(recipe: recipeInstance),
+                              ),
                             ),
-                          ),
-                      child: ListTile(
-                          title: Text(recipeInstance.name),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Portions: ${recipeInstance.portions}'),
-                              Text(
-                                  'Types: ${recipeInstance.types.map((type) => type.name).join(', ')}'),
-                            ],
-                          ),
-                          trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: <Widget>[
-                                IconButton(
-                                    icon: Icon(recipeInstance.status ==
-                                            RecipeStatus.planned
-                                        ? Icons.circle_outlined
-                                        : recipeInstance.status ==
-                                                RecipeStatus.ready
-                                            ? Icons.check_circle_outline
-                                            : Icons.check_circle),
-                                    onPressed: () =>
-                                        // TO DO: add modal for checking if status after ready should become planned or done
-                                        updateStatus(recipeInstance)),
-                                IconButton(
-                                  icon: const Icon(Icons.delete),
-                                  onPressed: () async {
-                                    bool confirm =
-                                        await Dialogs.showConfirmationDialog(
-                                              context,
-                                              'Verwijder recept',
-                                              'Weet je zeker dat je dit recept wil verwijderen?',
-                                            ) ??
-                                            false;
-                                    if (confirm) {
-                                      try {
-                                        DatabaseService
-                                            .deleteRecipeInstanceItem(
-                                                recipeInstance.id);
-                                      } catch (e) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
+                        child: ListTile(
+                            title: Text(recipeInstance.name),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Portions: ${recipeInstance.portions}'),
+                                Text(
+                                    'Types: ${recipeInstance.types.map((type) => type.name).join(', ')}'),
+                              ],
+                            ),
+                            trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  IconButton(
+                                      icon: Icon(recipeInstance.status ==
+                                              RecipeStatus.planned
+                                          ? Icons.circle_outlined
+                                          : recipeInstance.status ==
+                                                  RecipeStatus.ready
+                                              ? Icons.check_circle_outline
+                                              : Icons.check_circle),
+                                      onPressed: () =>
+                                          // TO DO: add modal for checking if status after ready should become planned or done
+                                          updateStatus(recipeInstance)),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete),
+                                    onPressed: () async {
+                                      bool confirm =
+                                          await Dialogs.showConfirmationDialog(
+                                                context,
+                                                'Verwijder recept',
+                                                'Weet je zeker dat je dit recept wil verwijderen?',
+                                              ) ??
+                                              false;
+                                      if (confirm) {
+                                        try {
+                                          DatabaseService
+                                              .deleteRecipeInstanceItem(
+                                                  recipeInstance.id);
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Fout bij verwijderen van recept'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        } finally {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(const SnackBar(
                                             content: Text(
-                                                'Fout bij verwijderen van recept'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      } finally {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              'Recept succesvol verwijderd'),
-                                          backgroundColor: Colors.green,
-                                        ));
+                                                'Recept succesvol verwijderd'),
+                                            backgroundColor: Colors.green,
+                                          ));
+                                        }
+                                        // Show snackbar for success / failure
                                       }
-                                      // Show snackbar for success / failure
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.link),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            RecipeToPantryLinkerWidget(
-                                                recipeInstance: recipeInstance),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ])));
-                }).toList(),
-              ),
-              ListView(
-                children: filteredRecipes.map((Recipe recipe) {
-                  return InkWell(
-                      onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  RecipeDetailPage(recipe: recipe),
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.link),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              RecipeToPantryLinkerWidget(
+                                                  recipeInstance:
+                                                      recipeInstance),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ])));
+                  }).toList(),
+                ))
+              ]),
+              Column(children: [
+                GenericSearchBar(
+                  onSearchChanged: (value) {
+                    setState(() {
+                      filterItems(recipes, filteredRecipes, value);
+                    });
+                  },
+                ),
+                Expanded(
+                    child: ListView(
+                  children: filteredRecipes.map((Recipe recipe) {
+                    return InkWell(
+                        onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    RecipeDetailPage(recipe: recipe),
+                              ),
                             ),
-                          ),
-                      child: ListTile(
-                          title: Text(recipe.name),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Portions: ${recipe.portions}'),
-                              Text(
-                                  'Types: ${recipe.types.map((type) => type.name).join(', ')}'),
-                            ],
-                          ),
-                          trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: <Widget>[
-                                IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                              builder: (context) =>
-                                                  EditRecipePage(
-                                                      recipe: recipe)),
-                                        )),
-                                IconButton(
-                                  icon: const Icon(Icons.delete),
-                                  onPressed: () async {
-                                    bool confirm =
-                                        await Dialogs.showConfirmationDialog(
-                                              context,
-                                              'Verwijder recept',
-                                              'Weet je zeker dat je dit recept wil verwijderen?',
-                                            ) ??
-                                            false;
-                                    if (confirm) {
-                                      DatabaseService.deleteRecipeItem(recipe
-                                          .id!); // Assume this method exists in DatabaseService
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.copy),
-                                  onPressed: () {
-                                    addInstance(recipe);
-                                  },
-                                ),
-                              ])));
-                }).toList(),
-              )
+                        child: ListTile(
+                            title: Text(recipe.name),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Portions: ${recipe.portions}'),
+                                Text(
+                                    'Types: ${recipe.types.map((type) => type.name).join(', ')}'),
+                              ],
+                            ),
+                            trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  IconButton(
+                                      icon: const Icon(Icons.edit),
+                                      onPressed: () => Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    EditRecipePage(
+                                                        recipe: recipe)),
+                                          )),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete),
+                                    onPressed: () async {
+                                      bool confirm =
+                                          await Dialogs.showConfirmationDialog(
+                                                context,
+                                                'Verwijder recept',
+                                                'Weet je zeker dat je dit recept wil verwijderen?',
+                                              ) ??
+                                              false;
+                                      if (confirm) {
+                                        DatabaseService.deleteRecipeItem(recipe
+                                            .id!); // Assume this method exists in DatabaseService
+                                      }
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.copy),
+                                    onPressed: () {
+                                      addInstance(recipe);
+                                    },
+                                  ),
+                                ])));
+                  }).toList(),
+                ))
+              ])
             ]),
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
