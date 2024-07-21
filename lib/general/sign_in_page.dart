@@ -25,8 +25,6 @@ class SignInPageState extends State<SignInPage> {
         idToken: googleSignInAuthentication.idToken,
       );
 
-      print("Email: ${googleSignInAccount.email}");
-
       await _auth.signInWithCredential(credential);
     } catch (e) {
       print('Error signing in with Google: $e');
