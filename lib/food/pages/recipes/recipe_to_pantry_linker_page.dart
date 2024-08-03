@@ -101,24 +101,33 @@ class RecipeToPantryLinkerWidgetState
     );
     // TO DO: improve performance by keeping list sorted when adding item
     if (newItem != null) {
-      PantryItem createdItem = PantryItem(
-          id: ingredients.indexOf(ingredient).toString(),
+      try {
+        List<PantryItemQuantity> quantities =
+            (newItem['quantities'] as List).map((q) {
+          return PantryItemQuantity.fromJson(q);
+        }).toList();
+
+        PantryItem createdItem = PantryItem(
           categoryId: newItem['productId'],
           name: newItem['name'].toLowerCase(),
-          quantities: newItem['quantities']
-              .map((q) => PantryItemQuantity.fromJson(q))
-              .toList(),
-          status: PantryItemStatus.needed);
+          quantities: quantities,
+          status: PantryItemStatus.needed,
+          preservation: PantryItemPreservation.days,
+        );
 
-      setState(() {
-        ingredient.pantryItems = [
-          IngredientToPantryItemsMapping(
-            pantryItemName: createdItem.name,
-            pantryItemId: createdItem.id!,
-          ),
-        ];
-        missingIngredients.add(createdItem, true);
-      });
+        setState(() {
+          ingredient.pantryItems = [
+            IngredientToPantryItemsMapping(
+              pantryItemName: createdItem.name,
+              pantryItemId: createdItem.id!,
+            ),
+          ];
+          missingIngredients.add(createdItem, true);
+        });
+      } catch (e) {
+        // Debugging: Print the error
+        print('Error creating PantryItem: $e');
+      }
     }
   }
 

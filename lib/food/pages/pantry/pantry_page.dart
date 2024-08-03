@@ -29,6 +29,10 @@ class PantryPageState extends State<PantryPage>
   TabController? tabController;
   Map<PantryItem, bool> checkedItems = {};
   bool allChecked = false;
+  Map<PantryItemPreservation?, bool> preservationFilters = {
+    for (var preservation in [...PantryItemPreservation.values, null])
+      preservation: true
+  };
 
   void filterItems(String searchTerm) {
     // Clear existing lists
@@ -46,6 +50,10 @@ class PantryPageState extends State<PantryPage>
                       product.name
                           .toLowerCase()
                           .contains(searchTerm.toLowerCase())));
+      if (preservationFilters.isNotEmpty) {
+        matchesSearchTerm =
+            matchesSearchTerm && preservationFilters[item.preservation] == true;
+      }
 
       if (matchesSearchTerm) {
         Map<String, double> quantities = item.getAvailableQuantity();
@@ -102,6 +110,33 @@ class PantryPageState extends State<PantryPage>
   void reserveItem(PantryItem item) async {
     PantryItem updatedPantryItem =
         await DatabaseService.reservePantryItem(item.id!, !item.reserved);
+
+    Map<String, double> quantities = item.getAvailableQuantity();
+
+    setState(() {
+      if (quantities.isEmpty) {
+        unknownQuantityItems = unknownQuantityItems
+            .map((pantryItem) =>
+                pantryItem.id == item.id ? updatedPantryItem : pantryItem)
+            .toList();
+      } else if (quantities.values.any((element) => element > 0)) {
+        availableItems = availableItems
+            .map((pantryItem) =>
+                pantryItem.id == item.id ? updatedPantryItem : pantryItem)
+            .toList();
+      } else {
+        unavailableItems = unavailableItems
+            .map((pantryItem) =>
+                pantryItem.id == item.id ? updatedPantryItem : pantryItem)
+            .toList();
+      }
+    });
+  }
+
+  void togglePriority(PantryItem item) async {
+    // TO DO: duplicate code, combine with reserveItem
+    PantryItem updatedPantryItem =
+        await DatabaseService.togglePriority(item.id!, !item.reserved);
 
     Map<String, double> quantities = item.getAvailableQuantity();
 
@@ -237,6 +272,7 @@ class PantryPageState extends State<PantryPage>
                           DataCell(SizedBox(height: 5)),
                           DataCell(SizedBox(height: 5)),
                           DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
                         ]),
                       ...getRows(unknownQuantityItems),
                       if (unavailableItems.isNotEmpty)
@@ -248,12 +284,45 @@ class PantryPageState extends State<PantryPage>
                           DataCell(SizedBox(height: 5)),
                           DataCell(SizedBox(height: 5)),
                           DataCell(SizedBox(height: 5)),
+                          DataCell(SizedBox(height: 5)),
                         ]),
                       ...getRows(unavailableItems)
                     ],
                     filterItems: filterItems,
-                    columns: const [
+                    columns: [
                       'Acties',
+                      DataColumn(
+                          label: Row(children: [
+                        const Text(
+                          'Houdbaarheid',
+                        ),
+                        PopupMenuButton(
+                            itemBuilder: (BuildContext context) => [
+                                  ...[...PantryItemPreservation.values, null]
+                                      .map((preservation) {
+                                    return PopupMenuItem(
+                                      child: Row(
+                                        children: [
+                                          Checkbox(
+                                              value: preservationFilters[
+                                                  preservation],
+                                              onChanged: (bool? checked) {
+                                                setState(() {
+                                                  preservationFilters[
+                                                          preservation] =
+                                                      checked ?? false;
+                                                  filterItems(searchTerm);
+                                                });
+                                              }),
+                                          Text(preservation?.label ??
+                                              'Onbekend'),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                ],
+                            icon: const Icon(Icons.filter_list)),
+                      ])),
                       'Categorie',
                       'Naam',
                       'Totaal',
@@ -281,11 +350,6 @@ class PantryPageState extends State<PantryPage>
                                                     : true;
                                             if (allChecked) allChecked = false;
                                           })),
-                                  // IconButton(
-                                  //   icon: const Icon(Icons.edit),
-                                  //   onPressed: () => showEditItemDialog(
-                                  //       context, item, products),
-                                  // ),
                                   IconButton(
                                     icon: const Icon(Icons.delete),
                                     onPressed: () async {
@@ -410,6 +474,24 @@ class PantryPageState extends State<PantryPage>
         //         .size
         //         .width >=
         //     700)
+        DataCell(
+          DropdownButton<PantryItemPreservation>(
+            value: item.preservation,
+            onChanged: (newValue) {
+              setState(() {
+                item.preservation = newValue;
+                DatabaseService.setPreservationStatus(item.id!, newValue!);
+              });
+            },
+            items: PantryItemPreservation.values
+                .map((PantryItemPreservation value) {
+              return DropdownMenuItem<PantryItemPreservation>(
+                value: value,
+                child: Text(value.label),
+              );
+            }).toList(),
+          ),
+        ),
         DataCell(Text(item.categoryId == null
             ? ""
             : products

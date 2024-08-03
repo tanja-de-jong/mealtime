@@ -11,16 +11,17 @@ class PantryItem {
   final bool reserved;
   final PantryItemStatus status;
   final List<PantryItemQuantity> quantities;
+  PantryItemPreservation? preservation;
 
-  PantryItem({
-    this.id,
-    this.categoryId,
-    required this.name,
-    this.usages = const [],
-    this.reserved = false,
-    this.status = PantryItemStatus.inStock,
-    this.quantities = const [],
-  });
+  PantryItem(
+      {this.id,
+      this.categoryId,
+      required this.name,
+      this.usages = const [],
+      this.reserved = false,
+      this.status = PantryItemStatus.inStock,
+      this.quantities = const [],
+      this.preservation});
 
   Map<String, dynamic> toJson() {
     return {
@@ -30,6 +31,7 @@ class PantryItem {
       'reserved': reserved,
       'status': status,
       'quantities': quantities.map((quantity) => quantity.toJson()).toList(),
+      'preservation': preservation.toString().split('.').last,
     };
   }
 
@@ -56,7 +58,7 @@ class PantryItem {
                   "quantity": object['quantity'],
                   "unit": object['unit'],
                   "dateOfReceival":
-                      DateTime.tryParse(object['dateOfReceival'] ?? "")
+                      DateTime.tryParse(object['dateOfReceival'] ?? ""),
                 }
               ]
             : []);
@@ -64,6 +66,7 @@ class PantryItem {
         .map<PantryItemQuantity>(
             (quantity) => PantryItemQuantity.fromJson(quantity))
         .toList();
+
     var result = PantryItem(
         id: id,
         categoryId: object['productId'],
@@ -79,7 +82,8 @@ class PantryItem {
               ? PantryItemStatus.needed
               : PantryItemStatus.inStock,
         ),
-        quantities: quantities);
+        quantities: quantities,
+        preservation: PantryItemPreservation.days);
     return result;
   }
 
@@ -204,6 +208,27 @@ enum PantryItemStatus {
   needed,
 }
 
+enum PantryItemPreservation { days, weeks, months, freeze, frozen, process }
+
+extension PantryItemPreservationExtension on PantryItemPreservation {
+  String get label {
+    switch (this) {
+      case PantryItemPreservation.days:
+        return 'Dagen';
+      case PantryItemPreservation.weeks:
+        return 'Weken';
+      case PantryItemPreservation.months:
+        return 'Maanden';
+      case PantryItemPreservation.freeze:
+        return 'Invriezen';
+      case PantryItemPreservation.frozen:
+        return 'Ingevroren';
+      case PantryItemPreservation.process:
+        return 'Verwerken';
+    }
+  }
+}
+
 class PantryItemQuantity {
   double? quantity;
   late final String? unit;
@@ -212,10 +237,16 @@ class PantryItemQuantity {
   PantryItemQuantity({this.quantity, this.unit, this.dateOfReceival});
 
   static PantryItemQuantity fromJson(Map<String, dynamic> object) {
-    return PantryItemQuantity(
-        quantity: object['quantity'],
-        unit: object['unit'],
-        dateOfReceival: parseDate(object['dateOfReceival']));
+    print('PantryItemQuantity.fromJson: $object');
+    try {
+      return PantryItemQuantity(
+          quantity: object['quantity'],
+          unit: object['unit'],
+          dateOfReceival: parseDate(object['dateOfReceival']));
+    } catch (e) {
+      print('Error parsing PantryItemQuantity: $e');
+      return PantryItemQuantity();
+    }
   }
 
   String getDaysOld() {

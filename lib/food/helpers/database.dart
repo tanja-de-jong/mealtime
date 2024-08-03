@@ -68,11 +68,9 @@ class DatabaseService {
       'name': name,
       'quantities': quantities,
     });
-    return PantryItem.fromJson(id, {
-      'productId': productId,
-      'name': name,
-      'quantities': quantities,
-    });
+    // Get the updated pantry item
+    DocumentSnapshot docSnapshot = await pantry.doc(id).get();
+    return PantryItem.fromJson(id, docSnapshot.data() as Map<String, dynamic>);
   }
 
   static void addPantryItemAmount(
@@ -151,6 +149,13 @@ class DatabaseService {
         .map((doc) =>
             Recipe.fromJson(doc.id, doc.data() as Map<String, dynamic>))
         .toList();
+  }
+
+  static Future<PantryItem> togglePriority(String id, bool isPriority) async {
+    await pantry.doc(id).update({'isPriority': isPriority});
+    DocumentSnapshot docSnapshot = await pantry.doc(id).get();
+    return PantryItem.fromJson(
+        docSnapshot.id, docSnapshot.data() as Map<String, dynamic>);
   }
 
   // Add a new recipe item
@@ -365,5 +370,13 @@ class DatabaseService {
         });
       }
     }
+  }
+
+  static Future<PantryItem> setPreservationStatus(
+      String id, PantryItemPreservation pantryItemPreservation) async {
+    await pantry.doc(id).update({'preservation': pantryItemPreservation.name});
+    DocumentSnapshot docSnapshot = await pantry.doc(id).get();
+    return PantryItem.fromJson(
+        docSnapshot.id, docSnapshot.data() as Map<String, dynamic>);
   }
 }
