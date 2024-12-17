@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:mealtime/food/helpers/database.dart';
+import 'package:mealtime/food/pages/recipes/edit_recipe_instance_page.dart';
 import 'package:mealtime/food/pages/recipes/edit_recipe_page.dart';
 import 'package:mealtime/food/pages/recipes/recipe_detail_page.dart';
 import 'package:mealtime/food/pages/recipes/recipe_to_pantry_linker_page.dart';
@@ -212,6 +213,18 @@ class RecipeListPageState extends State<RecipeListPage>
                                       onPressed: () =>
                                           // TO DO: add modal for checking if status after ready should become planned or done
                                           updateStatus(recipeInstance)),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            EditRecipeInstancePage(
+                                          recipeInstance: recipeInstance,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.delete),
                                     onPressed: () async {

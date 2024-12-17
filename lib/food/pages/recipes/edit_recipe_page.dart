@@ -168,7 +168,7 @@ class EditRecipePageState extends State<EditRecipePage> {
                   ),
                   TextFormField(
                       controller: _stepsController,
-                      decoration: const InputDecoration(labelText: 'Stappen'),
+                      decoration: const InputDecoration(labelText: 'Bereiding'),
                       keyboardType: TextInputType.multiline,
                       maxLines: null,
                       minLines: 5),

@@ -152,14 +152,10 @@ class DatabaseService {
   }
 
   static Future<bool> recipeExistsWithSource(String sourceUrl) async {
-    print('Checking for source URL: $sourceUrl');
-
     final querySnapshot = await FirebaseFirestore.instance
         .collection('recipes')
         .where('source', isEqualTo: sourceUrl)
         .get();
-
-    print('Found documents: ${querySnapshot.docs.length}');
 
     return querySnapshot.docs.isNotEmpty;
   }
@@ -391,5 +387,27 @@ class DatabaseService {
     DocumentSnapshot docSnapshot = await pantry.doc(id).get();
     return PantryItem.fromJson(
         docSnapshot.id, docSnapshot.data() as Map<String, dynamic>);
+  }
+
+  static Future<void> updateRecipeInstanceItem(
+    String id,
+    String name,
+    String source,
+    int portions,
+    String status,
+    List<String> types,
+    List<String> ingredients,
+    List<String> preparation,
+  ) {
+    return recipeInstances.doc(id).update({
+      'name': name,
+      'source': source,
+      'portions': portions,
+      'status': status,
+      'types': types,
+      'ingredients': ingredients
+          .map((ingredient) => {'ingredient': ingredient, 'pantryItems': []}),
+      'preparation': preparation,
+    });
   }
 }
