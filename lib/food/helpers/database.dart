@@ -151,6 +151,19 @@ class DatabaseService {
         .toList();
   }
 
+  static Future<bool> recipeExistsWithSource(String sourceUrl) async {
+    print('Checking for source URL: $sourceUrl');
+
+    final querySnapshot = await FirebaseFirestore.instance
+        .collection('recipes')
+        .where('source', isEqualTo: sourceUrl)
+        .get();
+
+    print('Found documents: ${querySnapshot.docs.length}');
+
+    return querySnapshot.docs.isNotEmpty;
+  }
+
   static Future<PantryItem> togglePriority(String id, bool isPriority) async {
     await pantry.doc(id).update({'isPriority': isPriority});
     DocumentSnapshot docSnapshot = await pantry.doc(id).get();

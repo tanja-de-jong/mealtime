@@ -34,6 +34,7 @@ class RecipeToPantryLinkerWidgetState
   List<TextEditingController> unitControllers = [];
 
   List<String> previousLinkIds = [];
+  Map<int, int> nrOfQuantities = {};
 
   bool isMissingIngredient(Ingredient ingredient) {
     return missingIngredients.contains(ingredient);
@@ -125,7 +126,6 @@ class RecipeToPantryLinkerWidgetState
           missingIngredients.add(createdItem, true);
         });
       } catch (e) {
-        // Debugging: Print the error
         print('Error creating PantryItem: $e');
       }
     }
@@ -172,92 +172,120 @@ class RecipeToPantryLinkerWidgetState
                         ? const SizedBox(
                             height: 50,
                             child: Center(child: Text("Op boodschappenlijst")))
-                        : Row(children: [
-                            SizedBox(
-                                width: 200,
-                                child: DropDownSearchField(
-                                  textFieldConfiguration:
-                                      TextFieldConfiguration(
-                                    controller:
-                                        dropDownSearchControllers[index],
-                                  ),
-                                  suggestionsCallback: (String pattern) {
-                                    return filter(pattern);
-                                  },
-                                  itemBuilder: (BuildContext context,
-                                      PantryItem itemData) {
-                                    return Text(itemData.status ==
-                                            PantryItemStatus.needed
-                                        ? "(${itemData.name})"
-                                        : itemData.name);
-                                  },
-                                  onSuggestionSelected:
-                                      (PantryItem suggestion) {
-                                    dropDownSearchControllers[index].text =
-                                        suggestion.name;
-                                    setState(() {
-                                      ingredient.pantryItems = [
-                                        IngredientToPantryItemsMapping(
-                                          pantryItemId: suggestion.id!,
-                                          pantryItemName: suggestion.name,
+                        : Column(children: [
+                            ...(List.generate(nrOfQuantities[index] ?? 1,
+                                (index) => index + 1).map(
+                              (quantityIndex) => Row(children: [
+                                SizedBox(
+                                    width: 200,
+                                    child: DropDownSearchField(
+                                      textFieldConfiguration:
+                                          TextFieldConfiguration(
+                                        controller:
+                                            dropDownSearchControllers[index],
+                                      ),
+                                      suggestionsCallback: (String pattern) {
+                                        return filter(pattern);
+                                      },
+                                      itemBuilder: (BuildContext context,
+                                          PantryItem itemData) {
+                                        return Text(itemData.status ==
+                                                PantryItemStatus.needed
+                                            ? "(${itemData.name})"
+                                            : itemData.name);
+                                      },
+                                      onSuggestionSelected:
+                                          (PantryItem suggestion) {
+                                        dropDownSearchControllers[index].text =
+                                            suggestion.name;
+                                        setState(() {
+                                          ingredient.pantryItems = [
+                                            IngredientToPantryItemsMapping(
+                                              pantryItemId: suggestion.id!,
+                                              pantryItemName: suggestion.name,
+                                            ),
+                                          ];
+                                        });
+                                        if (suggestion.status ==
+                                            PantryItemStatus.needed) {
+                                          // Update amount of missing pantry item
+                                          DatabaseService.addPantryItemAmount(
+                                              suggestion.id!,
+                                              suggestion.quantities[0].quantity,
+                                              suggestion.quantities[0].unit);
+                                        }
+                                      },
+                                      displayAllSuggestionWhenTap: true,
+                                    )),
+                                SizedBox(
+                                    width: 100,
+                                    child: TextField(
+                                      controller: quantityControllers[index],
+                                      decoration: InputDecoration(
+                                        hintText: pantryItem == null ||
+                                                pantryItem.quantities.isEmpty
+                                            ? ''
+                                            : pantryItem
+                                                .getAvailableQuantity()[
+                                                    ingredient
+                                                        .pantryItems[
+                                                            nrOfQuantities[
+                                                                    index] ??
+                                                                0]
+                                                        .unit]
+                                                ?.toString(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          setState(() {
+                                            ingredient.pantryItems[0].quantity =
+                                                double.tryParse(
+                                                    value.replaceAll(',', '.'));
+                                          });
+                                        });
+                                      },
+                                    )),
+                                SizedBox(
+                                    width: 100,
+                                    child: DropDownSearchField(
+                                        textFieldConfiguration:
+                                            TextFieldConfiguration(
+                                          controller: unitControllers[index],
                                         ),
-                                      ];
-                                    });
-                                    if (suggestion.status ==
-                                        PantryItemStatus.needed) {
-                                      // Update amount of missing pantry item
-                                      DatabaseService.addPantryItemAmount(
-                                          suggestion.id!,
-                                          suggestion.quantities[0].quantity,
-                                          suggestion.quantities[0].unit);
-                                    }
-                                  },
-                                  displayAllSuggestionWhenTap: true,
-                                )),
-                            SizedBox(
-                                width: 100,
-                                child: TextField(
-                                  controller: quantityControllers[index],
-                                  decoration: InputDecoration(
-                                    hintText: pantryItem == null ||
-                                            pantryItem.quantities.isEmpty
-                                        ? ''
-                                        : pantryItem
-                                            .getAvailableQuantity()[
-                                                pantryItem.quantities[0].unit!]
-                                            ?.toString(),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      setState(() {
-                                        ingredient.pantryItems[0].quantity =
-                                            double.tryParse(
-                                                value.replaceAll(',', '.'));
-                                      });
-                                    });
-                                  },
-                                )),
-                            SizedBox(
-                                width: 100,
-                                child: TextField(
-                                  controller: unitControllers[index],
-                                  decoration: InputDecoration(
-                                    hintText: pantryItem == null ||
-                                            pantryItem.quantities.isEmpty
-                                        ? ''
-                                        : pantryItem.quantities[0].unit
-                                            ?.toString(),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      setState(() {
-                                        ingredient.pantryItems[0].unit = value;
-                                      });
-                                    });
-                                  },
-                                ))
-
-                            // Text(pantryItem?.quantities[0].unit ?? ''))
+                                        suggestionsCallback: (String pattern) {
+                                          return pantryItem?.quantities
+                                                  .map((quantity) =>
+                                                      quantity.unit)
+                                                  .toSet()
+                                                  .where((unit) =>
+                                                      unit != null &&
+                                                      unit
+                                                          .toLowerCase()
+                                                          .contains(pattern
+                                                              .toLowerCase()))
+                                                  .toList() ??
+                                              [];
+                                        },
+                                        itemBuilder: (BuildContext context,
+                                            dynamic unit) {
+                                          return ListTile(
+                                            title: Text(unit),
+                                          );
+                                        },
+                                        onSuggestionSelected:
+                                            (dynamic suggestion) {
+                                          ingredient
+                                              .pantryItems[
+                                                  nrOfQuantities[index] ?? 0]
+                                              .unit = suggestion;
+                                          setState(() {
+                                            unitControllers[index].text =
+                                                suggestion;
+                                          });
+                                        },
+                                        displayAllSuggestionWhenTap: true)),
+                              ]),
+                            ))
                           ]),
                     pantryItem == null
                         ? IconButton(

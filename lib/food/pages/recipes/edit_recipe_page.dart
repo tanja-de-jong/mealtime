@@ -7,8 +7,9 @@ import '../../helpers/database.dart';
 
 class EditRecipePage extends StatefulWidget {
   final Recipe? recipe;
+  final bool isNewRecipe;
 
-  const EditRecipePage({super.key, this.recipe});
+  const EditRecipePage({super.key, this.recipe, this.isNewRecipe = false});
 
   @override
   EditRecipePageState createState() => EditRecipePageState();
@@ -24,6 +25,7 @@ class EditRecipePageState extends State<EditRecipePage> {
   final _stepsController = TextEditingController();
 
   final DatabaseService dbService = DatabaseService();
+  bool urlExistsWarning = false;
 
   @override
   void initState() {
@@ -40,11 +42,12 @@ class EditRecipePageState extends State<EditRecipePage> {
           .join('\n');
       _stepsController.text = widget.recipe!.preparation.join('\n');
     }
+    _checkUrlExists(_sourceController.text);
   }
 
   void _addRecipe() {
     if (_formKey.currentState!.validate()) {
-      if (widget.recipe != null) {
+      if (!widget.isNewRecipe) {
         // Update existing recipe
         DatabaseService.updateRecipeItem(
           widget.recipe!.id!,
@@ -76,6 +79,13 @@ class EditRecipePageState extends State<EditRecipePage> {
     }
   }
 
+  void _checkUrlExists(String url) async {
+    final exists = await DatabaseService.recipeExistsWithSource(url);
+    setState(() {
+      urlExistsWarning = exists;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,7 +114,27 @@ class EditRecipePageState extends State<EditRecipePage> {
                   TextFormField(
                     controller: _sourceController,
                     decoration: const InputDecoration(labelText: 'Bron'),
+                    onChanged: (value) {
+                      if (value.startsWith('http://') ||
+                          value.startsWith('https://')) {
+                        _checkUrlExists(value);
+                      }
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return null;
+                      }
+                      return null;
+                    },
                   ),
+                  if (urlExistsWarning)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        'Er bestaat al een recept met deze bron',
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                    ),
                   TextFormField(
                     controller: _portionsController,
                     decoration: const InputDecoration(labelText: 'Porties'),
@@ -144,9 +174,9 @@ class EditRecipePageState extends State<EditRecipePage> {
                       minLines: 5),
                   ElevatedButton(
                     onPressed: _addRecipe,
-                    child: Text(widget.recipe != null
-                        ? 'Recept Bijwerken'
-                        : 'Recept Toevoegen'), // 'Update Recipe' or 'Add Recipe' in Dutch
+                    child: Text(widget.isNewRecipe
+                        ? 'Recept Toevoegen'
+                        : 'Recept Bijwerken'), // 'Update Recipe' or 'Add Recipe' in Dutch
                   ),
                 ],
               ),

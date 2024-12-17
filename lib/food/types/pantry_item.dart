@@ -83,7 +83,13 @@ class PantryItem {
               : PantryItemStatus.inStock,
         ),
         quantities: quantities,
-        preservation: PantryItemPreservation.days);
+        preservation: object['preservation'] != null
+            ? PantryItemPreservation.values.firstWhere(
+                (preservation) =>
+                    preservation.toString() ==
+                    'PantryItemPreservation.${object['preservation']}',
+              )
+            : null);
     return result;
   }
 
@@ -120,7 +126,7 @@ class PantryItem {
     }
     Set<String> units = {
       ...usagesByUnit.keys,
-      ...quantities.map((quantity) => quantity.unit!)
+      ...quantities.map((quantity) => quantity.unit ?? "")
     };
     Map<String, double> result = {};
     for (String unit in units) {
@@ -237,7 +243,6 @@ class PantryItemQuantity {
   PantryItemQuantity({this.quantity, this.unit, this.dateOfReceival});
 
   static PantryItemQuantity fromJson(Map<String, dynamic> object) {
-    print('PantryItemQuantity.fromJson: $object');
     try {
       return PantryItemQuantity(
           quantity: object['quantity'],

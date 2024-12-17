@@ -32,7 +32,7 @@ class Recipe {
     };
   }
 
-  static Recipe fromJson(String id, Map<String, dynamic> object) {
+  static Recipe fromJson(String? id, Map<String, dynamic> object) {
     var recipe = Recipe(
         id: id,
         name: object['name'],

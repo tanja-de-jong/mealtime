@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:mealtime/food/helpers/database.dart';
 import 'package:mealtime/food/pages/recipes/edit_recipe_page.dart';
 import 'package:mealtime/food/pages/recipes/recipe_detail_page.dart';
@@ -8,6 +11,8 @@ import 'package:mealtime/food/types/recipe.dart';
 import 'package:mealtime/food/types/recipe_instance.dart';
 import 'package:mealtime/food/widgets/search_bar.dart';
 import 'package:mealtime/general/dialogs.dart';
+import 'package:mealtime/prompts/chat_prompts.dart';
+import 'package:mealtime/widgets/chat_widget.dart';
 
 class RecipeListPage extends StatefulWidget {
   const RecipeListPage({super.key});
@@ -47,7 +52,8 @@ class RecipeListPageState extends State<RecipeListPage>
     // Iterate over pantryItems and filter based on searchTerm
     for (var item in allItems) {
       bool matchesSearchTerm =
-          item.name.toLowerCase().contains(searchTerm.toLowerCase());
+          item.name.toLowerCase().contains(searchTerm.toLowerCase()) ||
+              item.source.toLowerCase().contains(searchTerm.toLowerCase());
 
       if (matchesSearchTerm) {
         filteredItems.add(item);
@@ -58,6 +64,21 @@ class RecipeListPageState extends State<RecipeListPage>
     filteredItems.sort((a, b) => a.name.compareTo(b.name));
 
     setState(() {});
+  }
+
+  void handleAddRecipeResponse(String response) {
+    Map<String, dynamic> recipeJson = jsonDecode(response);
+
+    Recipe recipe = Recipe.fromJson(null, recipeJson);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => EditRecipePage(
+                recipe: recipe,
+                isNewRecipe: true,
+              )),
+    );
   }
 
   void addInstance(Recipe recipe) async {
@@ -85,6 +106,13 @@ class RecipeListPageState extends State<RecipeListPage>
         backgroundColor: Colors.teal,
       ),
     );
+  }
+
+  void onRecipeCreated(Recipe recipe) {
+    setState(() {
+      recipes.add(recipe);
+      filteredRecipes.add(recipe);
+    });
   }
 
   Future<void> updateStatus(RecipeInstance recipeInstance) async {
@@ -306,15 +334,76 @@ class RecipeListPageState extends State<RecipeListPage>
                 ))
               ])
             ]),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const EditRecipePage()),
-          );
-        },
+      floatingActionButton: SpeedDial(
+        icon: Icons.add,
+        activeIcon: Icons.close,
+        backgroundColor: Colors.teal,
+        children: [
+          SpeedDialChild(
+            child: const Icon(Icons.back_hand),
+            label: 'Handmatig toevoegen',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const EditRecipePage()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: const Icon(Icons.text_fields),
+            label: 'Toevoegen via tekst',
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (BuildContext dialogContext) {
+                  return Dialog(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight:
+                            MediaQuery.of(dialogContext).size.height * 0.8,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Voeg recept toe via tekst',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width:
+                                  MediaQuery.of(dialogContext).size.width * 0.8,
+                              child: ChatWidget(
+                                prompt: chatPrompts['createRecipeFromText']!,
+                                handleResponse: (response) {
+                                  Navigator.of(dialogContext).pop();
+                                  handleAddRecipeResponse(response);
+                                },
+                                inputType: InputType.text,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
     );
   }
+}
+
+enum InputType {
+  text,
+  image,
 }

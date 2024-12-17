@@ -52,8 +52,9 @@ class EditPantryItemDialogState extends State<EditPantryItemDialog> {
             quantityController, unitController, dateController);
       }
       productId = widget.item!.categoryId;
-      productController.text =
-          products.firstWhere((product) => product.id == productId).name;
+      productController.text = productId == null
+          ? ""
+          : products.firstWhere((product) => product.id == productId).name;
     } else {
       addEmptyQuantity();
     }

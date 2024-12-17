@@ -1,5 +1,6 @@
 import 'package:clipboard/clipboard.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mealtime/food/helpers/constants.dart';
@@ -176,11 +177,22 @@ class PresencePageState extends State<PresencePage> {
       List<PantryItem> pantryItems, List<PantryItem> defaultPantryItems) {
     String template =
         "Ik heb recepten nodig voor ${presenceListToString()}. Ik wil graag één recept per keer kiezen. Ik wil dat een lunch minstens 400kcal bevat en een diner minstens 500 kcal. Ik heb de volgende ingrediënten in huis:\n\n";
-    return '$template${pantryItems.map((pantryItem) {
-      return '${pantryItem.name}: ${quantitiesToString(pantryItem.getAvailableQuantity())}';
-    }).join('\n')}\n\nVerder heb ik ook de volgende ingrediënten standaard in huis die gebruikt kunnen worden, maar niet hoeven te worden:\n\n${defaultPantryItems.map((pantryItem) {
-      return pantryItem.name;
-    }).join('\n')}';
+    Map<PantryItemPreservation?, List<PantryItem>> pantryItemsByPreservation =
+        groupBy([...pantryItems, ...defaultPantryItems],
+            (PantryItem pantryItem) => pantryItem.preservation);
+    List<String> preservationStrings =
+        pantryItemsByPreservation.keys.map((key) {
+      if (key == null) {
+        return 'Onbekend\n + ${pantryItemsByPreservation[key]!.map((pantryItem) {
+          return '${pantryItem.name}: ${quantitiesToString(pantryItem.getAvailableQuantity())}';
+        }).join('\n + ')}';
+      }
+      return '${key.label}\n + ${pantryItemsByPreservation[key]!.map((pantryItem) {
+        return '${pantryItem.name}: ${quantitiesToString(pantryItem.getAvailableQuantity())}';
+      }).join('\n + ')}';
+    }).toList();
+
+    return '$template${preservationStrings.join('\n\n')}\n\n';
   }
 
   @override
