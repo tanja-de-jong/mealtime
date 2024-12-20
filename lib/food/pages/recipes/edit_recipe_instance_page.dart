@@ -21,6 +21,7 @@ class _EditRecipeInstancePageState extends State<EditRecipeInstancePage> {
   List<MealType> types = [];
   final _ingredientsController = TextEditingController();
   final _stepsController = TextEditingController();
+  final _durationController = TextEditingController();
 
   @override
   void initState() {
@@ -32,6 +33,8 @@ class _EditRecipeInstancePageState extends State<EditRecipeInstancePage> {
     _ingredientsController.text =
         widget.recipeInstance.ingredients.map((e) => e.ingredient).join('\n');
     _stepsController.text = widget.recipeInstance.preparation.join('\n');
+    _durationController.text =
+        widget.recipeInstance.duration['Totale bereidingstijd'] ?? 'onbekend';
   }
 
   void _updateRecipeInstance() {
@@ -48,6 +51,9 @@ class _EditRecipeInstancePageState extends State<EditRecipeInstancePage> {
             .map((ingredient) => ingredient.trim())
             .toList(),
         _stepsController.text.split('\n').map((step) => step.trim()).toList(),
+        {
+          'Totale bereidingstijd': _durationController.text,
+        },
       );
       Navigator.pop(context);
     }
@@ -79,6 +85,11 @@ class _EditRecipeInstancePageState extends State<EditRecipeInstancePage> {
                 TextFormField(
                   controller: _sourceController,
                   decoration: const InputDecoration(labelText: 'Bron'),
+                ),
+                TextFormField(
+                  controller: _durationController,
+                  decoration:
+                      const InputDecoration(labelText: 'Bereidingstijd'),
                 ),
                 TextFormField(
                   controller: _portionsController,

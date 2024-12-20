@@ -169,8 +169,14 @@ class DatabaseService {
 
   // Add a new recipe item
   // Add a new recipe item
-  static Future<void> addRecipeItem(String name, String source, int portions,
-      List<String> types, List<String> ingredients, List<String> preparation) {
+  static Future<void> addRecipeItem(
+      String name,
+      String source,
+      int portions,
+      List<String> types,
+      List<String> ingredients,
+      List<String> preparation,
+      Map<String, String> duration) {
     return recipes.add({
       'name': name,
       'source': source,
@@ -179,6 +185,7 @@ class DatabaseService {
       'ingredients': ingredients
           .map((ingredient) => {'ingredient': ingredient, 'pantryItems': []}),
       'preparation': preparation,
+      'duration': duration,
     });
   }
 
@@ -276,7 +283,8 @@ class DatabaseService {
       int portions,
       List<String> types,
       List<String> ingredients,
-      List<String> preparation) {
+      List<String> preparation,
+      Map<String, String> duration) {
     return recipes.doc(id).update({
       'name': name,
       'source': source,
@@ -285,6 +293,7 @@ class DatabaseService {
       'ingredients': ingredients
           .map((ingredient) => {'ingredient': ingredient, 'pantryItems': []}),
       'preparation': preparation,
+      'duration': duration,
     });
   }
 
@@ -398,6 +407,7 @@ class DatabaseService {
     List<String> types,
     List<String> ingredients,
     List<String> preparation,
+    Map<String, String> duration,
   ) {
     return recipeInstances.doc(id).update({
       'name': name,
@@ -408,6 +418,7 @@ class DatabaseService {
       'ingredients': ingredients
           .map((ingredient) => {'ingredient': ingredient, 'pantryItems': []}),
       'preparation': preparation,
+      'duration': duration,
     });
   }
 }

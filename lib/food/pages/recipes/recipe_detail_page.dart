@@ -27,7 +27,7 @@ class RecipeDetailPageState extends State<RecipeDetailPage> {
           ),
           onTap: () async {
             if (await canLaunchUrl(uri!)) {
-              await launchUrl(uri); // TO DO: this is not working
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
             } else {
               throw 'Could not launch $uri';
             }
@@ -54,6 +54,9 @@ class RecipeDetailPageState extends State<RecipeDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   getSourceWidget(),
+                  Text(
+                    'Bereidingstijd: ${widget.recipe.duration['Totale bereidingstijd']}',
+                  ),
                   Text(
                     'Porties: ${widget.recipe.portions}',
                   ),

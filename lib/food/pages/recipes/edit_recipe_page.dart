@@ -23,7 +23,7 @@ class EditRecipePageState extends State<EditRecipePage> {
   List<MealType> types = [];
   final _ingredientsController = TextEditingController();
   final _stepsController = TextEditingController();
-
+  final _durationController = TextEditingController();
   final DatabaseService dbService = DatabaseService();
   bool urlExistsWarning = false;
 
@@ -41,6 +41,8 @@ class EditRecipePageState extends State<EditRecipePage> {
           )
           .join('\n');
       _stepsController.text = widget.recipe!.preparation.join('\n');
+      _durationController.text =
+          widget.recipe!.duration['Totale bereidingstijd'] ?? 'onbekend';
     }
     _checkUrlExists(_sourceController.text);
   }
@@ -60,6 +62,9 @@ class EditRecipePageState extends State<EditRecipePage> {
               .map((ingredient) => ingredient.trim())
               .toList(),
           _stepsController.text.split('\n').map((step) => step.trim()).toList(),
+          {
+            'Totale bereidingstijd': _durationController.text,
+          },
         );
       } else {
         // Add new recipe
@@ -73,6 +78,9 @@ class EditRecipePageState extends State<EditRecipePage> {
               .map((ingredient) => ingredient.trim())
               .toList(),
           _stepsController.text.split('\n').map((step) => step.trim()).toList(),
+          {
+            'Totale bereidingstijd': _durationController.text,
+          },
         );
       }
       Navigator.pop(context);
@@ -145,6 +153,11 @@ class EditRecipePageState extends State<EditRecipePage> {
                       }
                       return null;
                     },
+                  ),
+                  TextFormField(
+                    controller: _durationController,
+                    decoration:
+                        const InputDecoration(labelText: 'Bereidingstijd'),
                   ),
                   DropdownSearch<MealType>.multiSelection(
                     items: MealType.values.toList(),

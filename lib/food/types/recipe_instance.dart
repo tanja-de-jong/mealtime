@@ -18,6 +18,7 @@ class RecipeInstance extends Recipe {
     required super.types,
     required super.ingredients,
     required super.preparation,
+    required super.duration,
   });
 
   @override
@@ -57,6 +58,7 @@ class RecipeInstance extends Recipe {
           }).toList() ??
           [],
       preparation: List<String>.from(object['preparation'] ?? []),
+      duration: object['duration']?.cast<String, String>() ?? {},
     );
   }
 }

@@ -9,6 +9,7 @@ class Recipe {
   List<MealType> types;
   List<Ingredient> ingredients;
   List<String> preparation;
+  Map<String, String> duration;
 
   Recipe({
     this.id,
@@ -18,6 +19,7 @@ class Recipe {
     required this.types,
     required this.ingredients,
     required this.preparation,
+    required this.duration,
   });
 
   // Convert a Recipe to a Map
@@ -29,6 +31,7 @@ class Recipe {
       'types': types.map((e) => e.name).toList(),
       'ingredients': ingredients,
       'steps': preparation,
+      'duration': duration,
     };
   }
 
@@ -49,7 +52,8 @@ class Recipe {
                 [],
         preparation: List<String>.from(
           object['preparation'] ?? [],
-        ));
+        ),
+        duration: object['duration'] ?? {});
     return recipe;
   }
 }

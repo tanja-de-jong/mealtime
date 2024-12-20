@@ -194,9 +194,11 @@ class RecipeListPageState extends State<RecipeListPage>
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Portions: ${recipeInstance.portions}'),
+                                Text('Porties: ${recipeInstance.portions}'),
                                 Text(
-                                    'Types: ${recipeInstance.types.map((type) => type.name).join(', ')}'),
+                                    'Maaltijd: ${recipeInstance.types.map((type) => type.name).join(', ')}'),
+                                Text(
+                                    'Bereidingstijd: ${recipeInstance.duration['Totale bereidingstijd'] ?? 'onbekend'}'),
                               ],
                             ),
                             trailing: Row(
@@ -303,9 +305,11 @@ class RecipeListPageState extends State<RecipeListPage>
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Portions: ${recipe.portions}'),
+                                Text('Porties: ${recipe.portions}'),
                                 Text(
-                                    'Types: ${recipe.types.map((type) => type.name).join(', ')}'),
+                                    'Maaltijd: ${recipe.types.map((type) => type.name).join(', ')}'),
+                                Text(
+                                    'Bereidingstijd: ${recipe.duration['Totale bereidingstijd'] ?? 'onbekend'}'),
                               ],
                             ),
                             trailing: Row(
