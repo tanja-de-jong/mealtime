@@ -362,7 +362,9 @@ class RecipeListPageState extends State<RecipeListPage>
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const EditRecipePage()),
+                MaterialPageRoute(
+                    builder: (context) =>
+                        const EditRecipePage(isNewRecipe: true)),
               );
             },
           ),
