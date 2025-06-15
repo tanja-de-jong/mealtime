@@ -31,7 +31,7 @@ class PantryPageState extends State<PantryPage>
   bool allChecked = false;
   Map<PantryItemPreservation?, bool> preservationFilters = {
     for (var preservation in [...PantryItemPreservation.values, null])
-      preservation: true
+      preservation: preservation == PantryItemPreservation.frozen ? false : true
   };
 
   void filterItems(String searchTerm) {
